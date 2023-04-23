@@ -1,0 +1,16 @@
+---
+BasedOnStyle: LLVM
+ReflowComments: false
+IndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 120
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AlwaysBreakTemplateDeclarations: true
+
+IndentPPDirectives: AfterHash
+PointerAlignment: Right
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+BinPackParameters: false
