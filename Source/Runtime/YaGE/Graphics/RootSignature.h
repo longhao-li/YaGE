@@ -94,6 +94,22 @@ public:
     YAGE_API ~RootSignature() noexcept;
 
     /// @brief
+    ///   Get total number of CBV/SRV/UAV descriptors in this root signature.
+    ///
+    /// @return uint32_t
+    ///   Return total number of CBV/SRV/UAV descriptors in this root signature.
+    YAGE_NODISCARD auto DescriptorCount() const noexcept -> uint32_t {
+        return constantBufferViewCount + shaderResourceViewCount + unorderedAccessViewCount;
+    }
+
+    /// @brief
+    ///   Get total number of sampler descriptors in this root signature.
+    ///
+    /// @return uint32_t
+    ///   Return total number of sampler descriptors in this root signature.
+    YAGE_NODISCARD auto SamplerCount() const noexcept -> uint32_t { return samplerViewCount; }
+
+    /// @brief
     ///   Get the D3D12 root signature object.
     ///
     /// @return ID3D12RootSignature *

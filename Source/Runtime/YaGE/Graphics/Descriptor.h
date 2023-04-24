@@ -85,6 +85,81 @@ constexpr auto operator-(CpuDescriptorHandle lhs, ptrdiff_t rhs) noexcept -> Cpu
     return lhs;
 }
 
+class DescriptorHandle {
+public:
+    /// @brief
+    ///   Create a null shader visible descriptor handle.
+    constexpr DescriptorHandle() noexcept : cpuHandle{SIZE_T(-1)}, gpuHandle{UINT64(-1)} {}
+
+    /// @brief
+    ///   Create a descriptor handle from CPU and GPU handles.
+    ///
+    /// @param cpuHandle    CPU descriptor handle.
+    /// @param gpuHandle    GPU descriptor handle.
+    constexpr DescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept
+        : cpuHandle(cpuHandle), gpuHandle(gpuHandle) {}
+
+    /// @brief
+    ///   Apply an offset to this descriptor handle.
+    ///
+    /// @param offset   The offset to be applied.
+    ///
+    /// @return DescriptorHandle &
+    ///   Return reference to this descriptor handle.
+    constexpr auto operator+=(ptrdiff_t offset) noexcept -> DescriptorHandle & {
+        if (cpuHandle.ptr != SIZE_T(-1))
+            cpuHandle.ptr = static_cast<SIZE_T>(static_cast<ptrdiff_t>(cpuHandle.ptr) + offset);
+        if (gpuHandle.ptr != UINT64(-1))
+            gpuHandle.ptr = static_cast<UINT64>(static_cast<ptrdiff_t>(gpuHandle.ptr) + offset);
+        return *this;
+    }
+
+    /// @brief
+    ///   Apply an offset to this descriptor handle.
+    ///
+    /// @param offset   The offset to be applied.
+    ///
+    /// @return DescriptorHandle &
+    ///   Return reference to this descriptor handle.
+    constexpr auto operator-=(ptrdiff_t offset) noexcept -> DescriptorHandle & {
+        if (cpuHandle.ptr != SIZE_T(-1))
+            cpuHandle.ptr = static_cast<SIZE_T>(static_cast<ptrdiff_t>(cpuHandle.ptr) - offset);
+        if (gpuHandle.ptr != UINT64(-1))
+            gpuHandle.ptr = static_cast<UINT64>(static_cast<ptrdiff_t>(gpuHandle.ptr) - offset);
+        return *this;
+    }
+
+    /// @brief
+    ///   Allow implicit conversion to D3D12_CPU_DESCRIPTOR_HANDLE.
+    operator D3D12_CPU_DESCRIPTOR_HANDLE() const noexcept { return cpuHandle; }
+
+    /// @brief
+    ///   Allow implicit conversion to D3D12_GPU_DESCRIPTOR_HANDLE.
+    operator D3D12_GPU_DESCRIPTOR_HANDLE() const noexcept { return gpuHandle; }
+
+private:
+    /// @brief  CPU descriptor handle for this shader visible descriptor.
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
+
+    /// @brief  GPU descriptor handle for this shader visible descriptor.
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+};
+
+constexpr auto operator+(DescriptorHandle lhs, ptrdiff_t rhs) noexcept -> DescriptorHandle {
+    lhs += rhs;
+    return lhs;
+}
+
+constexpr auto operator+(ptrdiff_t lhs, DescriptorHandle rhs) noexcept -> DescriptorHandle {
+    rhs += lhs;
+    return rhs;
+}
+
+constexpr auto operator-(DescriptorHandle lhs, ptrdiff_t rhs) noexcept -> DescriptorHandle {
+    lhs -= rhs;
+    return lhs;
+}
+
 class CpuDescriptorAllocator {
 public:
     /// @brief
