@@ -581,3 +581,117 @@ auto YaGE::CommandBuffer::Reset() -> void {
 
     commandList->Reset(allocator, nullptr);
 }
+
+auto YaGE::CommandBuffer::Transition(GpuResource &resource, D3D12_RESOURCE_STATES newState) noexcept -> void {
+    if (resource.State() == newState)
+        return;
+
+    D3D12_RESOURCE_BARRIER barriers[2];
+    uint32_t               barrierCount = 1U;
+
+    const D3D12_RESOURCE_STATES oldState = resource.State();
+
+    barriers[0].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barriers[0].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barriers[0].Transition.pResource   = resource.resource.Get();
+    barriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barriers[0].Transition.StateBefore = oldState;
+    barriers[0].Transition.StateAfter  = newState;
+
+    resource.usageState = newState;
+
+    if (newState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        barriers[1].Type          = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barriers[1].Flags         = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[1].UAV.pResource = resource.resource.Get();
+
+        barrierCount = 2U;
+    }
+
+    commandList->ResourceBarrier(barrierCount, barriers);
+}
+
+auto YaGE::CommandBuffer::Copy(GpuResource &src, GpuResource &dest) noexcept -> void {
+    // Transition resource state.
+    D3D12_RESOURCE_BARRIER barriers[2];
+    uint32_t               barrierCount = 0;
+
+    if (!(src.State() & D3D12_RESOURCE_STATE_COPY_SOURCE)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = src.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = src.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+        barrierCount += 1;
+        src.usageState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    }
+
+    if (!(dest.State() & D3D12_RESOURCE_STATE_COPY_DEST)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = dest.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = dest.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        barrierCount += 1;
+        dest.usageState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+
+    if (barrierCount)
+        commandList->ResourceBarrier(barrierCount, barriers);
+
+    commandList->CopyResource(dest.resource.Get(), src.resource.Get());
+}
+
+auto YaGE::CommandBuffer::CopyBuffer(
+    GpuResource &src, size_t srcOffset, GpuResource &dest, size_t destOffset, size_t size) noexcept -> void {
+    // Transition resource state.
+    D3D12_RESOURCE_BARRIER barriers[2];
+    uint32_t               barrierCount = 0;
+
+    if (!(src.State() & D3D12_RESOURCE_STATE_COPY_SOURCE)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = src.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = src.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+        barrierCount += 1;
+        src.usageState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    }
+
+    if (!(dest.State() & D3D12_RESOURCE_STATE_COPY_DEST)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = dest.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = dest.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        barrierCount += 1;
+        dest.usageState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+
+    if (barrierCount)
+        commandList->ResourceBarrier(barrierCount, barriers);
+
+    commandList->CopyBufferRegion(dest.resource.Get(), destOffset, src.resource.Get(), srcOffset, size);
+}
+
+auto YaGE::CommandBuffer::CopyBuffer(const void *src, GpuResource &dest, size_t destOffset, size_t size) -> void {
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, src, size);
+    CopyBuffer(*allocation.resource, allocation.offset, dest, destOffset, size);
+}
+
+auto YaGE::CommandBuffer::SetRenderTarget(ColorBuffer &renderTarget) noexcept -> void {
+    if (!(renderTarget.State() & D3D12_RESOURCE_STATE_RENDER_TARGET))
+        this->Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = renderTarget.RenderTargetView();
+    commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+}

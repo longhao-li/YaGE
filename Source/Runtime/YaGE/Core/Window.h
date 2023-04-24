@@ -157,6 +157,8 @@ public:
     /// @param mods         Current modifier keys.
     YAGE_API virtual auto OnChar(char32_t codePoint, ModifierKey mods) -> void;
 
+    friend class SwapChain;
+
 private:
     /// @brief
     ///   For internal usage. Win32 window procedure.

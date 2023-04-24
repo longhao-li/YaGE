@@ -1,7 +1,7 @@
 #ifndef YAGE_GRAPHICS_COMMAND_BUFFER_H
 #define YAGE_GRAPHICS_COMMAND_BUFFER_H
 
-#include "GpuResource.h"
+#include "ColorBuffer.h"
 #include "RenderDevice.h"
 
 #include <d3d12.h>
@@ -129,6 +129,73 @@ public:
     /// @brief
     ///   Wait for last submission finishes executing on GPU.
     auto WaitForComplete() const noexcept -> void { renderDevice.Sync(lastSubmitSyncPoint); }
+
+    /// @brief
+    ///   Transition the specified resource to new state.
+    ///
+    /// @param[in] resource The GPU resource to be transitioned.
+    /// @param     newState The new state of the resource.
+    YAGE_API auto Transition(GpuResource &resource, D3D12_RESOURCE_STATES newState) noexcept -> void;
+
+    /// @brief
+    ///   Copy all data from @p src to @p dest.
+    /// @remarks
+    ///   Status of @p src and @p dest will be automatically transitioned if necessary.
+    ///
+    /// @param[in]  src     Source resource to be copied from.
+    /// @param[out] dest    Destination resource to be copied to.
+    YAGE_API auto Copy(GpuResource &src, GpuResource &dest) noexcept -> void;
+
+    /// @brief
+    ///   Copy @p size bytes of data from one buffer to another.
+    ///
+    /// @param[in]  src         Source buffer to be copied from.
+    /// @param      srcOffset   Offset from start of @p src to start of the copy.
+    /// @param[out] dest        Destination buffer to be copied to.
+    /// @param      destOffset  Offset from start of @p dest to start of the copy.
+    /// @param      size        Size in byte of data to be copied.
+    YAGE_API auto
+    CopyBuffer(GpuResource &src, size_t srcOffset, GpuResource &dest, size_t destOffset, size_t size) noexcept -> void;
+
+    /// @brief
+    ///   Copy @p size bytes of data from system memory to a buffer.
+    ///
+    /// @param[in]  src     Source data to be copied from.
+    /// @param[out] dest    Destination buffer to be copied to.
+    /// @param      offset  Offset from start of @p dest to start of the copy.
+    /// @param      size    Size in byte of data to be copied.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto CopyBuffer(const void *src, GpuResource &dest, size_t destOffset, size_t size) -> void;
+
+    /// @brief
+    ///   Set a single render target for current pipeline.
+    /// @note
+    ///   State of the specified color buffer will be automatically transitioned if necessary.
+    ///
+    /// @param[in] renderTarget The color buffer to be used as render target.
+    YAGE_API auto SetRenderTarget(ColorBuffer &renderTarget) noexcept -> void;
+
+    /// @brief
+    ///   Clear a color buffer to its clear color.
+    ///
+    /// @param[in] colorBuffer  The color buffer to be cleared.
+    auto ClearColor(const ColorBuffer &colorBuffer) noexcept -> void {
+        const Color &color = colorBuffer.ClearColor();
+        commandList->ClearRenderTargetView(colorBuffer.RenderTargetView(), reinterpret_cast<const float *>(&color), 0,
+                                           nullptr);
+    }
+
+    /// @brief
+    ///   Clear a color buffer to the specified color.
+    ///
+    /// @param[in] colorBuffer  The color buffer to be cleared.
+    /// @param[in] color        The color to be used to clear the color buffer.
+    auto ClearColor(const ColorBuffer &colorBuffer, const Color &color) noexcept -> void {
+        commandList->ClearRenderTargetView(colorBuffer.RenderTargetView(), reinterpret_cast<const float *>(&color), 0,
+                                           nullptr);
+    }
 
 private:
     /// @brief  The render device that is used to create this command buffer.

@@ -6,6 +6,8 @@
 
 namespace YaGE {
 
+class Window;
+
 class SwapChain {
 public:
     /// @brief
@@ -19,6 +21,21 @@ public:
     /// @throw RenderAPIException
     ///   Thrown if failed to create swap chain object for the window.
     YAGE_API SwapChain(HWND        window,
+                       uint32_t    numBuffers    = 2,
+                       DXGI_FORMAT bufferFormat  = DXGI_FORMAT_R8G8B8A8_UNORM,
+                       bool        enableTearing = false);
+
+    /// @brief
+    ///   Create a swap chain for the specified window. This swap chain will take over rendering works of the window.
+    ///
+    /// @param window           Window to render to.
+    /// @param numBuffers       Number of back buffers in the swap chain. This value will always be clamped between 2 and 3.
+    /// @param bufferFormat     Pixel format of back buffers.
+    /// @param enableTearing    Enable variable refresh rate (VRR) if supported. Please notice that no error will be reported if failed to enable variable refresh rate. You could use @p IsTearingEnabled() to check whether variable refresh rate is enabled.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to create swap chain object for the window.
+    YAGE_API SwapChain(Window     &window,
                        uint32_t    numBuffers    = 2,
                        DXGI_FORMAT bufferFormat  = DXGI_FORMAT_R8G8B8A8_UNORM,
                        bool        enableTearing = false);
