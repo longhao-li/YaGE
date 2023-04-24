@@ -145,7 +145,9 @@ YaGE::DynamicDescriptorHeap::DynamicDescriptorHeap()
       retiredDescriptorHeaps(),
       samplerHeap(),
       samplerHeapStart(),
-      retiredSamplerHeaps() {}
+      retiredSamplerHeaps(),
+      freeDescriptorCount(),
+      freeSamplerCount() {}
 
 YaGE::DynamicDescriptorHeap::~DynamicDescriptorHeap() noexcept {
     uint64_t syncPoint = renderDevice.AcquireSyncPoint();
@@ -217,6 +219,8 @@ auto YaGE::DynamicDescriptorHeap::Reset(uint64_t syncPoint) noexcept -> void {
         SamplerDescriptorHeapAllocator().Free(syncPoint, retiredSamplerHeaps);
         retiredSamplerHeaps.clear();
     }
+
+    rootSignature = nullptr;
 }
 
 auto YaGE::DynamicDescriptorHeap::BindGraphics(ID3D12GraphicsCommandList *cmdList) noexcept -> void {
