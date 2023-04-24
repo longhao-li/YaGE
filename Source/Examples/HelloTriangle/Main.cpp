@@ -1,11 +1,8 @@
 #include <YaGE/Core/Exception.h>
 #include <YaGE/Core/Window.h>
 #include <YaGE/Graphics/CommandBuffer.h>
+#include <YaGE/Graphics/RootSignature.h>
 #include <YaGE/Graphics/SwapChain.h>
-
-#include <fmt/chrono.h>
-
-#include <chrono>
 
 using namespace YaGE;
 
@@ -32,10 +29,12 @@ int WINAPI WinMain(_In_ HINSTANCE     hInstance,
         Window window(u"Hello Triangle", 800, 600, WindowStyle::Default);
         window.Center();
 
-        SwapChain     swapChain(window, 3, DXGI_FORMAT_R8G8B8A8_UNORM, true);
-        CommandBuffer commandBuffer;
-
+        SwapChain swapChain(window, 3, DXGI_FORMAT_R8G8B8A8_UNORM, true);
         swapChain.SetClearColor(Color::Azure());
+
+        RootSignature rootSig({}, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        CommandBuffer commandBuffer;
 
         MSG msg{};
         while (!window.IsClosed()) {
