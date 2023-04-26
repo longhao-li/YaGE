@@ -6,80 +6,20 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-#include <vector>
+#include <bitset>
 
 namespace YaGE {
-
-struct RootSignatureInfo {
-    /// @brief
-    ///   Create an empty graphics root signature info.
-    RootSignatureInfo() noexcept
-        : constantBufferViewCount(), shaderResourceViewCount(), unorderedAccessViewCount(), samplerViewCount() {}
-
-    /// @brief
-    ///   Add constant buffer views for the specified shader space.
-    ///
-    /// @param space    The specified shader space to add constant buffer views for. This value should not be greater than 16.
-    /// @param count    Number of constant buffer views to add.
-    auto AddConstantBufferView(uint32_t space, uint32_t count) noexcept -> RootSignatureInfo & {
-        constantBufferViewCount[space] += count;
-        return *this;
-    }
-
-    /// @brief
-    ///   Add shader resource views for the specified shader space.
-    ///
-    /// @param space    The specified shader space to add shader resource views for. This value should not be greater than 16.
-    /// @param count    Number of shader resource views to add.
-    auto AddShaderResourceView(uint32_t space, uint32_t count) noexcept -> RootSignatureInfo & {
-        shaderResourceViewCount[space] += count;
-        return *this;
-    }
-
-    /// @brief
-    ///   Add unordered access views for the specified shader space.
-    ///
-    /// @param space   The specified shader space to add unordered access views for. This value should not be greater than 16.
-    /// @param count   Number of unordered access views to add.
-    auto AddUnorderedAccessView(uint32_t space, uint32_t count) noexcept -> RootSignatureInfo & {
-        unorderedAccessViewCount[space] += count;
-        return *this;
-    }
-
-    /// @brief
-    ///   Add sampler views for the specified shader space.
-    ///
-    /// @param space    The specified shader space to add sampler views for.
-    /// @param count    Number of sampler views to add.
-    auto AddSamplerView(uint32_t space, uint32_t count) noexcept -> RootSignatureInfo & {
-        samplerViewCount[space] += count;
-        return *this;
-    }
-
-    /// @brief  Constant buffer view count for each space.
-    uint32_t constantBufferViewCount[16];
-
-    /// @brief  Shader resource view count for each space.
-    uint32_t shaderResourceViewCount[16];
-
-    /// @brief  Unordered access view count for each space.
-    uint32_t unorderedAccessViewCount[16];
-
-    /// @brief  Sampler view count for each space.
-    uint32_t samplerViewCount[16];
-};
 
 class RootSignature {
 public:
     /// @brief
-    ///   Create a root signature from the specified root signature info.
+    ///   Create a new root signature.
     ///
-    /// @param info     Root signature info that describes how to create this root signature.
-    /// @param flags    Root signature flags.
+    /// @param[in] desc     Root signature description that describes how to create this root signature.
     ///
     /// @throw RenderAPIException
-    ///   Thrown if failed to serialize and create this root signature.
-    YAGE_API RootSignature(const RootSignatureInfo &info, D3D12_ROOT_SIGNATURE_FLAGS flags);
+    ///   Thrown if failed to serialize or create the root signature.
+    YAGE_API RootSignature(const D3D12_ROOT_SIGNATURE_DESC &desc);
 
     /// @brief
     ///   Copy constructor is disabled.
@@ -94,57 +34,100 @@ public:
     YAGE_API ~RootSignature() noexcept;
 
     /// @brief
-    ///   Get total number of CBV/SRV/UAV descriptors in this root signature.
+    ///   Get total number of non-sampler descriptors in descriptor tables.
     ///
     /// @return uint32_t
-    ///   Return total number of CBV/SRV/UAV descriptors in this root signature.
-    YAGE_NODISCARD auto DescriptorCount() const noexcept -> uint32_t {
-        return constantBufferViewCount + shaderResourceViewCount + unorderedAccessViewCount;
+    ///   Return total number of non-sampler descriptors in descriptor tables.
+    YAGE_NODISCARD auto TableDescriptorCount() const noexcept -> uint32_t { return tableDescriptorCount; }
+
+    /// @brief
+    ///   Get number of static samplers in this root signature.
+    ///
+    /// @return uint32_t
+    ///   Return number of static samplers in this root signature.
+    YAGE_NODISCARD auto StaticSamplerCount() const noexcept -> uint32_t { return staticSamplerCount; }
+
+    /// @brief
+    ///   Get total number of non-static sampler descriptors in this root signature.
+    ///
+    /// @return uint32_t
+    ///   Return total number of non-static sampler descriptors in this root signature.
+    YAGE_NODISCARD auto TableSamplerCount() const noexcept -> uint32_t { return samplerCount; }
+
+    /// @brief
+    ///   Checks if the specified root parameter is a non-sampler descriptor table.
+    ///
+    /// @param slot Root parameter index.
+    ///
+    /// @return
+    /// @retval true  The specified root parameter is a non-sampler descriptor table.
+    /// @retval false The specified root parameter is not a non-sampler descriptor table.
+    YAGE_NODISCARD auto IsDescriptorTable(uint32_t slot) const noexcept -> bool { return descriptorTableFlags[slot]; }
+
+    /// @brief
+    ///   Checks if the specified root parameter is a sampler descriptor table.
+    ///
+    /// @param slot Root parameter index.
+    ///
+    /// @return
+    /// @retval true  The specified root parameter is a sampler descriptor table.
+    /// @retval false The specified root parameter is not a sampler descriptor table.
+    YAGE_NODISCARD auto IsSamplerTable(uint32_t slot) const noexcept -> bool { return samplerTableFlags[slot]; }
+
+    /// @brief
+    ///   Get number of descriptors in the specified non-sampler descriptor table.
+    ///
+    /// @param slot Root parameter index.
+    ///
+    /// @return uint32_t
+    ///   Return number of descriptors in the specified non-sampler descriptor table. Return 0 if the specified root parameter is not a root descriptor table.
+    YAGE_NODISCARD auto NonSamplerDescriptorTableSize(uint32_t slot) const noexcept -> uint32_t {
+        if (descriptorTableFlags[slot])
+            return descriptorTableSizes[slot];
+        return 0;
     }
 
     /// @brief
-    ///   Get total number of sampler descriptors in this root signature.
+    ///   Get number of descriptors in the specified sampler table.
+    ///
+    /// @param slot Root parameter index.
     ///
     /// @return uint32_t
-    ///   Return total number of sampler descriptors in this root signature.
-    YAGE_NODISCARD auto SamplerCount() const noexcept -> uint32_t { return samplerViewCount; }
+    ///   Return number of descriptors in the specified sampler table. Return 0 if the specified root parameter is not a sampler descriptor table.
+    YAGE_NODISCARD auto SamplerTableSize(uint32_t slot) const noexcept -> uint32_t {
+        if (samplerTableFlags[slot])
+            return descriptorTableSizes[slot];
+        return 0;
+    }
 
     /// @brief
-    ///   Get the D3D12 root signature object.
+    ///   Get D3D12 root signature object.
     ///
     /// @return ID3D12RootSignature *
     ///   Return D3D12 root signature object.
     YAGE_NODISCARD auto D3D12RootSignature() const noexcept -> ID3D12RootSignature * { return rootSignature.Get(); }
 
-    friend class DynamicDescriptorHeap;
-
 private:
     /// @brief  D3D12 root signature object.
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
 
-    /// @brief  Offset from start of root signature in each descriptor table.
-    uint32_t constantBufferViewOffset[16];
+    /// @brief  Total number of non-sampler descriptor count in descriptor tables.
+    uint32_t tableDescriptorCount;
 
-    /// @brief  Total number of constant buffer views.
-    uint32_t constantBufferViewCount;
+    /// @brief  Number of static samplers.
+    uint32_t staticSamplerCount;
 
-    /// @brief  Offset from start of root signature in each descriptor table.
-    uint32_t shaderResourceViewOffset[16];
+    /// @brief  Total number of non-static sampler descriptor count.
+    uint32_t samplerCount;
 
-    /// @brief  Total number of shader resource views.
-    uint32_t shaderResourceViewCount;
+    /// @brief  One bit is set for non-sampler root descriptor table.
+    std::bitset<64> descriptorTableFlags;
 
-    /// @brief  Offset from start of root signature in each descriptor table.
-    uint32_t unorderedAccessViewOffset[16];
+    /// @brief  One bit is set for sampler root descriptor table.
+    std::bitset<64> samplerTableFlags;
 
-    /// @brief  Total number of unordered access views.
-    uint32_t unorderedAccessViewCount;
-
-    /// @brief  Offset from start of root signature in each descriptor table.
-    uint32_t samplerViewOffset[16];
-
-    /// @brief  Total number of sampler views.
-    uint32_t samplerViewCount;
+    /// @brief  Number of descriptors in each descriptor table.
+    uint32_t descriptorTableSizes[64];
 };
 
 } // namespace YaGE

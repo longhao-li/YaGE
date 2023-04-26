@@ -7,126 +7,52 @@
 #include <vector>
 
 using namespace YaGE;
+using Microsoft::WRL::ComPtr;
 
-YaGE::RootSignature::RootSignature(const RootSignatureInfo &info, D3D12_ROOT_SIGNATURE_FLAGS flags)
+YaGE::RootSignature::RootSignature(const D3D12_ROOT_SIGNATURE_DESC &desc)
     : rootSignature(),
-      constantBufferViewOffset(),
-      constantBufferViewCount(),
-      shaderResourceViewOffset(),
-      shaderResourceViewCount(),
-      unorderedAccessViewOffset(),
-      unorderedAccessViewCount(),
-      samplerViewOffset(),
-      samplerViewCount() {
-    std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
-    std::vector<D3D12_DESCRIPTOR_RANGE> samplerRanges;
+      tableDescriptorCount(),
+      staticSamplerCount(),
+      samplerCount(),
+      descriptorTableFlags(),
+      samplerTableFlags(),
+      descriptorTableSizes() {
+    // Serialize root signature desc.
+    HRESULT          hr = S_OK;
+    ComPtr<ID3DBlob> serializedDesc;
 
-    // Apply offsets.
-    for (size_t i = 0; i < std::size(constantBufferViewOffset); ++i) {
-        constantBufferViewOffset[i] = constantBufferViewCount;
-        constantBufferViewCount += info.constantBufferViewCount[i];
-
-        if (info.constantBufferViewCount[i] != 0)
-            ranges.push_back(D3D12_DESCRIPTOR_RANGE{
-                /* RangeType                         = */ D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-                /* NumDescriptors                    = */ info.constantBufferViewCount[i],
-                /* BaseShaderRegister                = */ 0,
-                /* RegisterSpace                     = */ static_cast<UINT>(i),
-                /* OffsetInDescriptorsFromTableStart = */ constantBufferViewOffset[i],
-            });
-    }
-
-    for (size_t i = 0; i < std::size(shaderResourceViewOffset); ++i) {
-        shaderResourceViewOffset[i] = shaderResourceViewCount;
-        shaderResourceViewOffset[i] += constantBufferViewCount;
-        shaderResourceViewCount += info.shaderResourceViewCount[i];
-
-        if (info.shaderResourceViewCount[i] != 0)
-            ranges.push_back(D3D12_DESCRIPTOR_RANGE{
-                /* RangeType                         = */ D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-                /* NumDescriptors                    = */ info.shaderResourceViewCount[i],
-                /* BaseShaderRegister                = */ 0,
-                /* RegisterSpace                     = */ static_cast<UINT>(i),
-                /* OffsetInDescriptorsFromTableStart = */ shaderResourceViewOffset[i],
-            });
-    }
-
-    for (size_t i = 0; i < std::size(unorderedAccessViewOffset); ++i) {
-        unorderedAccessViewOffset[i] = unorderedAccessViewCount;
-        unorderedAccessViewOffset[i] += constantBufferViewCount;
-        unorderedAccessViewOffset[i] += shaderResourceViewCount;
-        unorderedAccessViewCount += info.unorderedAccessViewCount[i];
-
-        if (info.unorderedAccessViewCount[i] != 0)
-            ranges.push_back(D3D12_DESCRIPTOR_RANGE{
-                /* RangeType                         = */ D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
-                /* NumDescriptors                    = */ info.unorderedAccessViewCount[i],
-                /* BaseShaderRegister                = */ 0,
-                /* RegisterSpace                     = */ static_cast<UINT>(i),
-                /* OffsetInDescriptorsFromTableStart = */ unorderedAccessViewOffset[i],
-            });
-    }
-
-    for (size_t i = 0; i < std::size(samplerViewOffset); ++i) {
-        samplerViewOffset[i] = samplerViewCount;
-        samplerViewCount += info.samplerViewCount[i];
-
-        if (info.samplerViewCount[i] != 0)
-            samplerRanges.push_back(D3D12_DESCRIPTOR_RANGE{
-                /* RangeType                         = */ D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
-                /* NumDescriptors                    = */ info.samplerViewCount[i],
-                /* BaseShaderRegister                = */ 0,
-                /* RegisterSpace                     = */ static_cast<UINT>(i),
-                /* OffsetInDescriptorsFromTableStart = */ samplerViewOffset[i],
-            });
-    }
-
-    D3D12_ROOT_PARAMETER rootParamerers[2];
-    uint32_t             rootParameterCount = 0;
-
-    if (!ranges.empty()) {
-        rootParamerers[rootParameterCount].ParameterType   = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParamerers[rootParameterCount].DescriptorTable = {
-            /* NumDescriptorRanges = */ static_cast<UINT>(ranges.size()),
-            /* pDescriptorRanges   = */ ranges.data(),
-        };
-        rootParamerers[rootParameterCount].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-        rootParameterCount += 1;
-    }
-
-    if (!samplerRanges.empty()) {
-        rootParamerers[rootParameterCount].ParameterType   = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParamerers[rootParameterCount].DescriptorTable = {
-            /* NumDescriptorRanges = */ static_cast<UINT>(samplerRanges.size()),
-            /* pDescriptorRanges   = */ samplerRanges.data(),
-        };
-        rootParamerers[rootParameterCount].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-        rootParameterCount += 1;
-    }
-
-    const D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{
-        /* NumParameters     = */ rootParameterCount,
-        /* pParameters       = */ rootParamerers,
-        /* NumStaticSamplers = */ 0,
-        /* pStaticSamplers   = */ nullptr,
-        /* Flags             = */ flags,
-    };
-
-    Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSignature;
-    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0,
-                                             serializedRootSignature.GetAddressOf(), nullptr);
+    hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_0, serializedDesc.GetAddressOf(), nullptr);
     if (FAILED(hr))
-        throw RenderAPIException(hr, u"Failed to serialize root signature: ");
+        throw RenderAPIException(hr, u"Failed to serialize root signature.");
 
-    RenderDevice &device = RenderDevice::Singleton();
     // Create root signature.
-    hr = device.Device()->CreateRootSignature(0, serializedRootSignature->GetBufferPointer(),
-                                              serializedRootSignature->GetBufferSize(),
+    RenderDevice &device = RenderDevice::Singleton();
+    hr = device.Device()->CreateRootSignature(0, serializedDesc->GetBufferPointer(), serializedDesc->GetBufferSize(),
                                               IID_PPV_ARGS(rootSignature.GetAddressOf()));
     if (FAILED(hr))
         throw RenderAPIException(hr, u"Failed to create root signature.");
+
+    // Cache metadata.
+    staticSamplerCount = desc.NumStaticSamplers;
+
+    for (uint32_t i = 0; i < desc.NumParameters; ++i) {
+        const D3D12_ROOT_PARAMETER &param = desc.pParameters[i];
+        if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE) {
+            const uint32_t numRanges = param.DescriptorTable.NumDescriptorRanges;
+            const auto    *ranges    = param.DescriptorTable.pDescriptorRanges;
+
+            for (uint32_t j = 0; j < numRanges; ++j)
+                descriptorTableSizes[i] += ranges[j].NumDescriptors;
+
+            if (ranges->RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER) {
+                samplerTableFlags[i] = 1;
+                samplerCount += descriptorTableSizes[i];
+            } else {
+                descriptorTableFlags[i] = 1;
+                tableDescriptorCount += descriptorTableSizes[i];
+            }
+        }
+    }
 }
 
 YaGE::RootSignature::~RootSignature() noexcept {}

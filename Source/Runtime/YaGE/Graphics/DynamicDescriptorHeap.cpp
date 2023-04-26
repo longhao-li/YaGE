@@ -50,6 +50,12 @@ public:
     /// @param heaps      Descriptor heaps to be freed.
     auto Free(uint64_t syncPoint, const std::vector<ID3D12DescriptorHeap *> &heaps) noexcept -> void;
 
+    /// @brief
+    ///   Get singleton instance of this class.
+    ///
+    /// @param heapType Type of descriptor heap allocator to get.
+    YAGE_NODISCARD static auto Singleton(D3D12_DESCRIPTOR_HEAP_TYPE heapType) -> DescriptorHeapAllocator &;
+
 private:
     /// @brief  Render device that is used to create descriptor heaps.
     RenderDevice &renderDevice;
@@ -122,220 +128,285 @@ auto DescriptorHeapAllocator::Free(uint64_t syncPoint, const std::vector<ID3D12D
         retiredHeaps.emplace(syncPoint, heap);
 }
 
-YAGE_NODISCARD auto DefaultDescriptorHeapAllocator() -> DescriptorHeapAllocator & {
-    static DescriptorHeapAllocator instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    return instance;
-}
-
-YAGE_NODISCARD auto SamplerDescriptorHeapAllocator() -> DescriptorHeapAllocator & {
-    static DescriptorHeapAllocator instance(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-    return instance;
+YAGE_NODISCARD auto DescriptorHeapAllocator::Singleton(D3D12_DESCRIPTOR_HEAP_TYPE heapType)
+    -> DescriptorHeapAllocator & {
+    if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
+        static DescriptorHeapAllocator instance(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        return instance;
+    } else {
+        static DescriptorHeapAllocator instance(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        return instance;
+    }
 }
 
 } // namespace
 
-YaGE::DynamicDescriptorHeap::DynamicDescriptorHeap()
-    : renderDevice(RenderDevice::Singleton()),
-      device(renderDevice.Device()),
-      rootSignature(nullptr),
-      constantBufferViewSize(device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)),
-      samplerViewSize(device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)),
-      descriptorHeap(),
-      descriptorHeapStart(),
-      retiredDescriptorHeaps(),
-      samplerHeap(),
-      samplerHeapStart(),
-      retiredSamplerHeaps(),
+YaGE::DynamicDescriptorHeap::DynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE descriptorType)
+    : device(RenderDevice::Singleton().Device()),
+      descriptorType(descriptorType),
+      descriptorSize(device->GetDescriptorHandleIncrementSize(descriptorType)),
+      graphicsRootSignature(nullptr),
+      computeRootSignature(nullptr),
+      currentHeap(nullptr),
+      currentHandle(),
       freeDescriptorCount(),
-      freeSamplerCount() {}
+      retiredHeaps(),
+      graphicsCachedParameters(),
+      computeCachedParameters(),
+      graphicsTableCache(),
+      computeTableCache() {}
 
 YaGE::DynamicDescriptorHeap::~DynamicDescriptorHeap() noexcept {
-    uint64_t syncPoint = renderDevice.AcquireSyncPoint();
-
-    if (descriptorHeap != nullptr)
-        retiredDescriptorHeaps.push_back(descriptorHeap);
-
-    if (!retiredDescriptorHeaps.empty()) {
-        DefaultDescriptorHeapAllocator().Free(syncPoint, retiredDescriptorHeaps);
-        retiredDescriptorHeaps.clear();
+    if (currentHeap != nullptr) {
+        retiredHeaps.push_back(currentHeap);
+        currentHeap = nullptr;
     }
 
-    if (samplerHeap != nullptr)
-        retiredSamplerHeaps.push_back(samplerHeap);
+    const uint64_t syncPoint = RenderDevice::Singleton().AcquireSyncPoint();
+    DescriptorHeapAllocator::Singleton(descriptorType).Free(syncPoint, retiredHeaps);
+    retiredHeaps.clear();
+}
 
-    if (!retiredSamplerHeaps.empty()) {
-        SamplerDescriptorHeapAllocator().Free(syncPoint, retiredSamplerHeaps);
-        retiredSamplerHeaps.clear();
+auto YaGE::DynamicDescriptorHeap::CleanUp(uint64_t syncPoint) noexcept -> void {
+    if (retiredHeaps.empty())
+        return;
+
+    DescriptorHeapAllocator::Singleton(descriptorType).Free(syncPoint, retiredHeaps);
+    retiredHeaps.clear();
+
+    graphicsRootSignature = nullptr;
+    computeRootSignature  = nullptr;
+
+    graphicsCachedParameters.clear();
+    computeCachedParameters.clear();
+
+    memset(graphicsTableCache, 0, sizeof(graphicsTableCache));
+    memset(computeTableCache, 0, sizeof(computeTableCache));
+}
+
+auto YaGE::DynamicDescriptorHeap::ParseGraphicsRootSignature(RootSignature &rootSig) noexcept -> void {
+    graphicsRootSignature = &rootSig;
+
+    const uint32_t paramCount = (descriptorType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? rootSig.TableSamplerCount()
+                                                                                      : rootSig.TableDescriptorCount());
+
+    graphicsCachedParameters.resize(paramCount);
+    memset(graphicsCachedParameters.data(), 0, paramCount * sizeof(CachedParameter));
+
+    uint32_t offset = 0;
+    if (descriptorType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
+        for (uint32_t i = 0; i < 64; ++i) {
+            uint32_t tableSize                   = rootSig.SamplerTableSize(i);
+            graphicsTableCache[i].parameterCount = tableSize;
+            graphicsTableCache[i].parameters     = graphicsCachedParameters.data() + offset;
+            offset += tableSize;
+        }
+    } else {
+        for (uint32_t i = 0; i < 64; ++i) {
+            uint32_t tableSize                   = rootSig.NonSamplerDescriptorTableSize(i);
+            graphicsTableCache[i].parameterCount = tableSize;
+            graphicsTableCache[i].parameters     = graphicsCachedParameters.data() + offset;
+            offset += tableSize;
+        }
     }
 }
 
-auto YaGE::DynamicDescriptorHeap::ParseRootSignature(RootSignature &rootSig) -> void {
-    rootSignature = &rootSig;
+auto YaGE::DynamicDescriptorHeap::BindGraphicsDescriptor(uint32_t            paramIndex,
+                                                         uint32_t            offset,
+                                                         CpuDescriptorHandle descriptor) noexcept -> void {
+    assert(paramIndex < 64);
 
-    // Allocate a new descriptor heap if necessary.
-    if (freeDescriptorCount < rootSig.DescriptorCount()) {
-        if (descriptorHeap != nullptr)
-            retiredDescriptorHeaps.push_back(descriptorHeap);
+    DescriptorTableCache &tableCache = graphicsTableCache[paramIndex];
+    if (offset >= tableCache.parameterCount)
+        return; // No such descriptor.
 
-        descriptorHeap      = DefaultDescriptorHeapAllocator().Allocate();
-        descriptorHeapStart = DescriptorHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-                                               descriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    CachedParameter &param = tableCache.parameters[offset];
+
+    param.parameterType              = ParameterType::DescriptorHandle;
+    param.parameter.descriptorHandle = descriptor;
+}
+
+auto YaGE::DynamicDescriptorHeap::BindGraphicsDescriptor(uint32_t                               paramIndex,
+                                                         uint32_t                               offset,
+                                                         const D3D12_CONSTANT_BUFFER_VIEW_DESC &desc) noexcept -> void {
+
+    assert(paramIndex < 64);
+
+    DescriptorTableCache &tableCache = graphicsTableCache[paramIndex];
+    if (offset >= tableCache.parameterCount)
+        return; // No such descriptor.
+
+    CachedParameter &param = tableCache.parameters[offset];
+
+    param.parameterType                = ParameterType::ConstantBufferView;
+    param.parameter.constantBufferView = desc;
+}
+
+auto YaGE::DynamicDescriptorHeap::ParseComputeRootSignature(RootSignature &rootSig) noexcept -> void {
+    computeRootSignature = &rootSig;
+
+    const uint32_t paramCount = (descriptorType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? rootSig.TableSamplerCount()
+                                                                                      : rootSig.TableDescriptorCount());
+
+    computeCachedParameters.resize(paramCount);
+    memset(computeCachedParameters.data(), 0, paramCount * sizeof(CachedParameter));
+
+    uint32_t offset = 0;
+    if (descriptorType == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
+        for (uint32_t i = 0; i < 64; ++i) {
+            uint32_t tableSize                  = rootSig.SamplerTableSize(i);
+            computeTableCache[i].parameterCount = tableSize;
+            computeTableCache[i].parameters     = computeCachedParameters.data() + offset;
+            offset += tableSize;
+        }
+    } else {
+        for (uint32_t i = 0; i < 64; ++i) {
+            uint32_t tableSize                  = rootSig.NonSamplerDescriptorTableSize(i);
+            computeTableCache[i].parameterCount = tableSize;
+            computeTableCache[i].parameters     = computeCachedParameters.data() + offset;
+            offset += tableSize;
+        }
+    }
+}
+
+auto YaGE::DynamicDescriptorHeap::BindComputeDescriptor(uint32_t            paramIndex,
+                                                        uint32_t            offset,
+                                                        CpuDescriptorHandle descriptor) noexcept -> void {
+    assert(paramIndex < 64);
+
+    DescriptorTableCache &tableCache = computeTableCache[paramIndex];
+    if (offset >= tableCache.parameterCount)
+        return; // No such descriptor.
+
+    CachedParameter &param = tableCache.parameters[offset];
+
+    param.parameterType              = ParameterType::DescriptorHandle;
+    param.parameter.descriptorHandle = descriptor;
+}
+
+auto YaGE::DynamicDescriptorHeap::BindComputeDescriptor(uint32_t                               paramIndex,
+                                                        uint32_t                               offset,
+                                                        const D3D12_CONSTANT_BUFFER_VIEW_DESC &desc) noexcept -> void {
+    assert(paramIndex < 64);
+
+    DescriptorTableCache &tableCache = computeTableCache[paramIndex];
+    if (offset >= tableCache.parameterCount)
+        return; // No such descriptor.
+
+    CachedParameter &param = tableCache.parameters[offset];
+
+    param.parameterType                = ParameterType::ConstantBufferView;
+    param.parameter.constantBufferView = desc;
+}
+
+auto YaGE::DynamicDescriptorHeap::Commit(ID3D12GraphicsCommandList *cmdList) noexcept -> void {
+    assert(graphicsCachedParameters.size() + computeCachedParameters.size() < 1024);
+
+    // Require new descriptor heap if no enough space.
+    const uint32_t requiredCount =
+        static_cast<uint32_t>(graphicsCachedParameters.size() + computeCachedParameters.size());
+
+    if (requiredCount > freeDescriptorCount) {
+        if (currentHeap != nullptr)
+            retiredHeaps.push_back(currentHeap);
+
+        auto &allocator     = DescriptorHeapAllocator::Singleton(descriptorType);
+        currentHeap         = allocator.Allocate();
+        currentHandle       = DescriptorHandle(currentHeap->GetCPUDescriptorHandleForHeapStart(),
+                                               currentHeap->GetGPUDescriptorHandleForHeapStart());
         freeDescriptorCount = NUM_DESCRIPTORS_PER_HEAP;
-    } else {
-        const uint32_t offset = NUM_DESCRIPTORS_PER_HEAP - freeDescriptorCount;
-        descriptorHeapStart   = DescriptorHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-                                                 descriptorHeap->GetGPUDescriptorHandleForHeapStart());
-        descriptorHeapStart += (offset * constantBufferViewSize);
     }
 
-    freeDescriptorCount -= rootSig.DescriptorCount();
+    if (requiredCount != 0)
+        cmdList->SetDescriptorHeaps(1, &currentHeap);
 
-    // Allocate a new sampler descriptor heap if necessary.
-    if (freeSamplerCount < rootSig.SamplerCount()) {
-        if (samplerHeap != nullptr)
-            retiredSamplerHeaps.push_back(samplerHeap);
+    // Copy graphics descriptors.
+    if (graphicsRootSignature != nullptr) {
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> copySrc;
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> copyDest;
+        std::vector<UINT>                        copyCount;
 
-        samplerHeap      = SamplerDescriptorHeapAllocator().Allocate();
-        samplerHeapStart = DescriptorHandle(samplerHeap->GetCPUDescriptorHandleForHeapStart(),
-                                            samplerHeap->GetGPUDescriptorHandleForHeapStart());
-        freeSamplerCount = NUM_DESCRIPTORS_PER_HEAP;
-    } else {
-        const uint32_t offset = NUM_DESCRIPTORS_PER_HEAP - freeSamplerCount;
-        samplerHeapStart      = DescriptorHandle(samplerHeap->GetCPUDescriptorHandleForHeapStart(),
-                                                 samplerHeap->GetGPUDescriptorHandleForHeapStart());
-        samplerHeapStart += (offset * samplerViewSize);
+        copySrc.reserve(graphicsCachedParameters.size());
+        copyDest.reserve(graphicsCachedParameters.size());
+        copyCount.reserve(graphicsCachedParameters.size());
+
+        for (uint32_t i = 0; i < 64; ++i) {
+            DescriptorTableCache &tableCache = graphicsTableCache[i];
+            if (tableCache.parameterCount != 0)
+                cmdList->SetGraphicsRootDescriptorTable(i, currentHandle);
+
+            const CachedParameter *paramStart = tableCache.parameters;
+            const CachedParameter *paramEnd   = paramStart + tableCache.parameterCount;
+
+            for (const CachedParameter *param = paramStart; param != paramEnd; ++param) {
+                switch (param->parameterType) {
+                case ParameterType::DescriptorHandle:
+                    copySrc.push_back(param->parameter.descriptorHandle);
+                    copyDest.push_back(currentHandle);
+                    copyCount.push_back(1);
+                    break;
+
+                case ParameterType::ConstantBufferView:
+                    device->CreateConstantBufferView(&(param->parameter.constantBufferView), currentHandle);
+                    break;
+
+                default:
+                    break;
+                }
+
+                currentHandle += descriptorSize;
+                freeDescriptorCount -= 1;
+            }
+        }
+
+        if (!copySrc.empty())
+            device->CopyDescriptors(static_cast<UINT>(copyDest.size()), copyDest.data(), copyCount.data(),
+                                    static_cast<UINT>(copySrc.size()), copySrc.data(), copyCount.data(),
+                                    descriptorType);
     }
 
-    freeSamplerCount -= rootSig.SamplerCount();
-}
+    // Copy compute descriptors.
+    if (computeRootSignature != nullptr) {
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> copySrc;
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> copyDest;
+        std::vector<UINT>                        copyCount;
 
-auto YaGE::DynamicDescriptorHeap::Reset(uint64_t syncPoint) noexcept -> void {
-    if (!retiredDescriptorHeaps.empty()) {
-        DefaultDescriptorHeapAllocator().Free(syncPoint, retiredDescriptorHeaps);
-        retiredDescriptorHeaps.clear();
+        copySrc.reserve(computeCachedParameters.size());
+        copyDest.reserve(computeCachedParameters.size());
+        copyCount.reserve(computeCachedParameters.size());
+
+        for (uint32_t i = 0; i < 64; ++i) {
+            DescriptorTableCache &tableCache = computeTableCache[i];
+            if (tableCache.parameterCount != 0)
+                cmdList->SetComputeRootDescriptorTable(i, currentHandle);
+
+            const CachedParameter *paramStart = tableCache.parameters;
+            const CachedParameter *paramEnd   = paramStart + tableCache.parameterCount;
+
+            for (const CachedParameter *param = paramStart; param != paramEnd; ++param) {
+                switch (param->parameterType) {
+                case ParameterType::DescriptorHandle:
+                    copySrc.push_back(param->parameter.descriptorHandle);
+                    copyDest.push_back(currentHandle);
+                    copyCount.push_back(1);
+                    break;
+
+                case ParameterType::ConstantBufferView:
+                    device->CreateConstantBufferView(&(param->parameter.constantBufferView), currentHandle);
+                    break;
+
+                default:
+                    break;
+                }
+
+                currentHandle += descriptorSize;
+                freeDescriptorCount -= 1;
+            }
+        }
+
+        if (!copySrc.empty())
+            device->CopyDescriptors(static_cast<UINT>(copyDest.size()), copyDest.data(), copyCount.data(),
+                                    static_cast<UINT>(copySrc.size()), copySrc.data(), copyCount.data(),
+                                    descriptorType);
     }
-
-    if (!retiredSamplerHeaps.empty()) {
-        SamplerDescriptorHeapAllocator().Free(syncPoint, retiredSamplerHeaps);
-        retiredSamplerHeaps.clear();
-    }
-
-    rootSignature = nullptr;
-}
-
-auto YaGE::DynamicDescriptorHeap::BindGraphics(ID3D12GraphicsCommandList *cmdList) noexcept -> void {
-    if (rootSignature->DescriptorCount() != 0) {
-        cmdList->SetDescriptorHeaps(1, &descriptorHeap);
-        cmdList->SetGraphicsRootDescriptorTable(0, descriptorHeapStart);
-    }
-
-    if (rootSignature->SamplerCount() != 0) {
-        const uint32_t paramIndex = rootSignature->DescriptorCount() == 0 ? 0 : 1;
-        cmdList->SetDescriptorHeaps(1, &samplerHeap);
-        cmdList->SetGraphicsRootDescriptorTable(paramIndex, samplerHeapStart);
-    }
-}
-
-auto YaGE::DynamicDescriptorHeap::BindCompute(ID3D12GraphicsCommandList *cmdList) noexcept -> void {
-    if (rootSignature->DescriptorCount() != 0) {
-        cmdList->SetDescriptorHeaps(1, &descriptorHeap);
-        cmdList->SetComputeRootDescriptorTable(0, descriptorHeapStart);
-    }
-
-    if (rootSignature->SamplerCount() != 0) {
-        const uint32_t paramIndex = rootSignature->DescriptorCount() == 0 ? 0 : 1;
-        cmdList->SetDescriptorHeaps(1, &samplerHeap);
-        cmdList->SetComputeRootDescriptorTable(paramIndex, samplerHeapStart);
-    }
-}
-
-auto YaGE::DynamicDescriptorHeap::BindConstantBufferView(uint32_t            shaderSpace,
-                                                         uint32_t            shaderRegister,
-                                                         CpuDescriptorHandle constantBufferView) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->constantBufferViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CopyDescriptorsSimple(1, handle, constantBufferView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindConstantBufferView(uint32_t shaderSpace,
-                                                         uint32_t shaderRegister,
-                                                         uint64_t gpuAddress,
-                                                         uint32_t size) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->constantBufferViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-
-    const D3D12_CONSTANT_BUFFER_VIEW_DESC desc{
-        /* BufferLocation = */ gpuAddress,
-        /* SizeInBytes    = */ size,
-    };
-
-    device->CreateConstantBufferView(&desc, handle);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindShaderResourceView(uint32_t            shaderSpace,
-                                                         uint32_t            shaderRegister,
-                                                         CpuDescriptorHandle shaderResourceView) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->shaderResourceViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CopyDescriptorsSimple(1, handle, shaderResourceView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindShaderResourceView(uint32_t        shaderSpace,
-                                                         uint32_t        shaderRegister,
-                                                         ID3D12Resource *resource) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->shaderResourceViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CreateShaderResourceView(resource, nullptr, handle);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindShaderResourceView(uint32_t                               shaderSpace,
-                                                         uint32_t                               shaderRegister,
-                                                         ID3D12Resource                        *resource,
-                                                         const D3D12_SHADER_RESOURCE_VIEW_DESC &desc) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->shaderResourceViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CreateShaderResourceView(resource, &desc, handle);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindUnorderedAccessView(uint32_t            shaderSpace,
-                                                          uint32_t            shaderRegister,
-                                                          CpuDescriptorHandle unorderedAccessView) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->unorderedAccessViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CopyDescriptorsSimple(1, handle, unorderedAccessView, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindUnorderedAccessView(uint32_t                                shaderSpace,
-                                                          uint32_t                                shaderRegister,
-                                                          ID3D12Resource                         *resource,
-                                                          const D3D12_UNORDERED_ACCESS_VIEW_DESC &desc) noexcept
-    -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->unorderedAccessViewOffset[shaderSpace];
-    DescriptorHandle handle = descriptorHeapStart + ((offset + shaderRegister) * constantBufferViewSize);
-    device->CreateUnorderedAccessView(resource, nullptr, &desc, handle);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindSampler(uint32_t            shaderSpace,
-                                              uint32_t            shaderRegister,
-                                              CpuDescriptorHandle sampler) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->samplerViewOffset[shaderSpace];
-    DescriptorHandle handle = samplerHeapStart + ((offset + shaderRegister) * samplerViewSize);
-    device->CopyDescriptorsSimple(1, handle, sampler, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-}
-
-auto YaGE::DynamicDescriptorHeap::BindSampler(uint32_t                  shaderSpace,
-                                              uint32_t                  shaderRegister,
-                                              const D3D12_SAMPLER_DESC &desc) noexcept -> void {
-    assert(shaderSpace < 16);
-    const uint32_t   offset = rootSignature->samplerViewOffset[shaderSpace];
-    DescriptorHandle handle = samplerHeapStart + ((offset + shaderRegister) * samplerViewSize);
-    device->CreateSampler(&desc, handle);
 }

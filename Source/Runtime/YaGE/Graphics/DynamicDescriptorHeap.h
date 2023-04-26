@@ -8,16 +8,38 @@
 
 namespace YaGE {
 
-class RenderDevice;
-
 class DynamicDescriptorHeap {
+private:
+    enum class ParameterType {
+        None = 0,
+        DescriptorHandle,
+        ConstantBufferView,
+    };
+
+    /// @note
+    ///   This is a descriptor handle if @p desc.SizeInBytes is 0.
+    struct CachedParameter {
+        ParameterType parameterType;
+        union {
+            D3D12_CPU_DESCRIPTOR_HANDLE     descriptorHandle;
+            D3D12_CONSTANT_BUFFER_VIEW_DESC constantBufferView;
+        } parameter;
+    };
+
+    struct DescriptorTableCache {
+        CachedParameter *parameters;
+        uint32_t         parameterCount;
+    };
+
 public:
     /// @brief
-    ///   Create a new dynamic descriptor heap.
+    ///   Create a new dynamic descriptor heap for the specified type of descriptor.
+    ///
+    /// @param descriptorType   Type of this descriptor heap. Must be @p D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV or @p D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER.
     ///
     /// @throw RenderAPIException
-    ///   Thrown if failed to acquire render device singleton.
-    YAGE_API DynamicDescriptorHeap();
+    ///   Thrown if failed to acquire D3D12 device.
+    YAGE_API DynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE descriptorType);
 
     /// @brief
     ///   Copy constructor is disabled.
@@ -32,163 +54,106 @@ public:
     YAGE_API ~DynamicDescriptorHeap() noexcept;
 
     /// @brief
-    ///   Set root signature.
+    ///   Clean up all descriptors and root signatures.
     ///
-    /// @param[in] rootSig  Root signature that is used to determine the descriptor tables.
-    ///
-    /// @throw RenderAPIException
-    ///   Thrown if failed to acquire new shader visible descriptor heaps.
-    YAGE_API auto ParseRootSignature(RootSignature &rootSig) -> void;
+    /// @param syncPoint    The sync point that indicates when the retired descriptor heaps could be reused.
+    YAGE_API auto CleanUp(uint64_t syncPoint) noexcept -> void;
 
     /// @brief
-    ///   Reset this dynamic descriptor heap.
+    ///   Parse the specified graphics root signature and prepare for binding descriptors.
     ///
-    /// @param syncPoint    Sync point that is used to determine when the freed descriptor heaps could be reused.
-    YAGE_API auto Reset(uint64_t syncPoint) noexcept -> void;
+    /// @param[in] rootSig  The root signature to be parsed.
+    YAGE_API auto ParseGraphicsRootSignature(RootSignature &rootSig) noexcept -> void;
 
     /// @brief
-    ///   Bind descriptor tables and heap to graphics pipeline of the specified command list.
+    ///   Bind a graphics descriptor to the specified descriptor table.
     ///
-    /// @param cmdList  Command list that is used to bind descriptor tables and heaps.
-    YAGE_API auto BindGraphics(ID3D12GraphicsCommandList *cmdList) noexcept -> void;
-
-    /// @brief
-    ///   Bind descriptor tables and heap to compute pipeline of the specified command list.
-    ///
-    /// @param cmdList  Command list that is used to bind descriptor tables and heaps.
-    YAGE_API auto BindCompute(ID3D12GraphicsCommandList *cmdList) noexcept -> void;
-
-    /// @brief
-    ///   Bind constant buffer view to the given shader register.
-    ///
-    /// @param shaderSpace          Shader space to be bind to.
-    /// @param shaderRegister       Shader register to be bind to.
-    /// @param constantBufferView   Constant buffer view CPU handle to be bind to the given shader register.
-    YAGE_API auto BindConstantBufferView(uint32_t            shaderSpace,
-                                         uint32_t            shaderRegister,
-                                         CpuDescriptorHandle constantBufferView) noexcept -> void;
-
-    /// @brief
-    ///   Create a new constant buffer view for the given shader register.
-    ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param gpuAddress       GPU address of the constant buffer.
-    /// @param size             Size in byte of the constant buffer.
-    YAGE_API auto
-    BindConstantBufferView(uint32_t shaderSpace, uint32_t shaderRegister, uint64_t gpuAddress, uint32_t size) noexcept
+    /// @param paramIndex   Root parameter index of the descriptor table in the root signature.
+    /// @param offset       Offset of the descriptor from start of the descriptor table.
+    /// @param descriptor   Descriptor to bind.
+    YAGE_API auto BindGraphicsDescriptor(uint32_t paramIndex, uint32_t offset, CpuDescriptorHandle descriptor) noexcept
         -> void;
 
     /// @brief
-    ///   Bind shader resource view to the given shader register.
+    ///   Create a new constant buffer view at the specified offset of the descriptor table.
     ///
-    /// @param shaderSpace          Shader space to be bind to.
-    /// @param shaderRegister       Shader register to be bind to.
-    /// @param shaderResourceView   Shader resource view CPU handle to be bind to the given shader register.
-    YAGE_API auto BindShaderResourceView(uint32_t            shaderSpace,
-                                         uint32_t            shaderRegister,
-                                         CpuDescriptorHandle shaderResourceView) noexcept -> void;
+    /// @param paramIndex   Root parameter index of the descriptor table in the root signature.
+    /// @param offset       Offset of the descriptor from start of the descriptor table.
+    /// @param desc         Description of the constant buffer view.
+    YAGE_API auto BindGraphicsDescriptor(uint32_t                               paramIndex,
+                                         uint32_t                               offset,
+                                         const D3D12_CONSTANT_BUFFER_VIEW_DESC &desc) noexcept -> void;
 
     /// @brief
-    ///   Create a new shader resource view for the given shader register.
+    ///   Parse the specified compute root signature and prepare for binding descriptors.
     ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param resource         Resource to create the new shader resource view.
-    YAGE_API auto
-    BindShaderResourceView(uint32_t shaderSpace, uint32_t shaderRegister, ID3D12Resource *resource) noexcept -> void;
+    /// @param[in] rootSig  The root signature to be parsed.
+    YAGE_API auto ParseComputeRootSignature(RootSignature &rootSig) noexcept -> void;
 
     /// @brief
-    ///   Create a new shader resource view for the given shader register.
+    ///   Bind a compute descriptor to the specified descriptor table.
     ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param resource         Resource to create the new shader resource view.
-    /// @param desc             Describes how to create the new shader resource view.
-    YAGE_API auto BindShaderResourceView(uint32_t                               shaderSpace,
-                                         uint32_t                               shaderRegister,
-                                         ID3D12Resource                        *resource,
-                                         const D3D12_SHADER_RESOURCE_VIEW_DESC &desc) noexcept -> void;
-
-    /// @brief
-    ///   Bind unordered access view to the given shader register.
-    ///
-    /// @param shaderSpace          Shader space to be bind to.
-    /// @param shaderRegister       Shader register to be bind to.
-    /// @param unorderedAccessView  Unordered access view CPU handle to be bind to the given shader register.
-    YAGE_API auto BindUnorderedAccessView(uint32_t            shaderSpace,
-                                          uint32_t            shaderRegister,
-                                          CpuDescriptorHandle unorderedAccessView) noexcept -> void;
-
-    /// @brief
-    ///   Create a new unordered access view for the given shader register.
-    ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param resource         Resource to create the new unordered access view.
-    /// @param desc             Describes how to create the new unordered access view.
-    YAGE_API auto BindUnorderedAccessView(uint32_t                                shaderSpace,
-                                          uint32_t                                shaderRegister,
-                                          ID3D12Resource                         *resource,
-                                          const D3D12_UNORDERED_ACCESS_VIEW_DESC &desc) noexcept -> void;
-
-    /// @brief
-    ///   Bind sampler to the given shader register.
-    ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param sampler          Sampler CPU handle to be bind to the given shader register.
-    YAGE_API auto BindSampler(uint32_t shaderSpace, uint32_t shaderRegister, CpuDescriptorHandle sampler) noexcept
+    /// @param paramIndex   Root parameter index of the descriptor table in the root signature.
+    /// @param offset       Offset of the descriptor from start of the descriptor table.
+    /// @param descriptor   Descriptor to bind.
+    YAGE_API auto BindComputeDescriptor(uint32_t paramIndex, uint32_t offset, CpuDescriptorHandle descriptor) noexcept
         -> void;
 
     /// @brief
-    ///   Create a new sampler for the given shader register.
+    ///   Create a new constant buffer view at the specified offset of the descriptor table.
     ///
-    /// @param shaderSpace      Shader space to be bind to.
-    /// @param shaderRegister   Shader register to be bind to.
-    /// @param desc             Describes how to create the new sampler.
-    YAGE_API auto BindSampler(uint32_t shaderSpace, uint32_t shaderRegister, const D3D12_SAMPLER_DESC &desc) noexcept
-        -> void;
+    /// @param paramIndex   Root parameter index of the descriptor table in the root signature.
+    /// @param offset       Offset of the descriptor from start of the descriptor table.
+    /// @param desc         Description of the constant buffer view.
+    YAGE_API auto BindComputeDescriptor(uint32_t                               paramIndex,
+                                        uint32_t                               offset,
+                                        const D3D12_CONSTANT_BUFFER_VIEW_DESC &desc) noexcept -> void;
+
+    /// @brief
+    ///   Upload all descriptors in the cached descriptor tables to GPU. This method will also bind the descriptor heap to the command list.
+    ///
+    /// @param cmdList  Command list to upload descriptors.
+    YAGE_API auto Commit(ID3D12GraphicsCommandList *cmdList) noexcept -> void;
 
 private:
-    /// @brief  Render device that is used to create descriptor heaps.
-    RenderDevice &renderDevice;
-
-    /// @brief  D3D12 device that is used to copy descriptors.
+    /// @brief  Device that is used to create and copy descriptors.
     ID3D12Device *const device;
 
-    /// @brief  Current root signature.
-    RootSignature *rootSignature;
+    /// @brief  Descriptor type of this dynamic descriptor heap.
+    const D3D12_DESCRIPTOR_HEAP_TYPE descriptorType;
 
-    /// @brief  Increment size of CBV/SRV/UAV.
-    const uint32_t constantBufferViewSize;
+    /// @brief  Descriptor increment size.
+    const uint32_t descriptorSize;
 
-    /// @brief  Increment size of sampler view.
-    const uint32_t samplerViewSize;
+    /// @brief  Current graphics root signature.
+    RootSignature *graphicsRootSignature;
 
-    /// @brief  Shader visible CBV/SRV/UAV descriptor heap.
-    ID3D12DescriptorHeap *descriptorHeap;
+    /// @brief  Current compute root signature.
+    RootSignature *computeRootSignature;
 
-    /// @brief  Descriptor handle to the start of the descriptor heap.
-    DescriptorHandle descriptorHeapStart;
+    /// @brief  Current dynamic descriptor heap.
+    ID3D12DescriptorHeap *currentHeap;
 
-    /// @brief  Retired shader visible CBV/SRV/UAV descriptor heaps.
-    std::vector<ID3D12DescriptorHeap *> retiredDescriptorHeaps;
-
-    /// @brief  Shader visible sampler descriptor heap.
-    ID3D12DescriptorHeap *samplerHeap;
-
-    /// @brief  Descriptor handle to the start of the sampler heap.
-    DescriptorHandle samplerHeapStart;
-
-    /// @brief  Retired shader visible sampler descriptor heaps.
-    std::vector<ID3D12DescriptorHeap *> retiredSamplerHeaps;
+    /// @brief  Descriptor handle to next allocation position.
+    DescriptorHandle currentHandle;
 
     /// @brief  Number of free descriptors in current descriptor heap.
     uint32_t freeDescriptorCount;
 
-    /// @brief  Number of free samplers in current sampler heap.
-    uint32_t freeSamplerCount;
+    /// @brief  Retired descriptor heaps.
+    std::vector<ID3D12DescriptorHeap *> retiredHeaps;
+
+    /// @brief  Cached parameters for graphics root signature.
+    std::vector<CachedParameter> graphicsCachedParameters;
+
+    /// @brief  Cached parameters for compute root signature.
+    std::vector<CachedParameter> computeCachedParameters;
+
+    /// @brief  Cached descriptor tables for graphics root signature.
+    DescriptorTableCache graphicsTableCache[64];
+
+    /// @brief  Cached descriptor tables for compute root signature.
+    DescriptorTableCache computeTableCache[64];
 };
 
 } // namespace YaGE
