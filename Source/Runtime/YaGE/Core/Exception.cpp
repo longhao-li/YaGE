@@ -8,7 +8,7 @@ YaGE::Exception::~Exception() noexcept {}
 
 auto YaGE::Exception::what() const noexcept -> const char * { return "YaGE::Exception::what() is deprecated."; }
 
-YAGE_NODISCARD auto SystemErrorMessage(int32_t errorCode) noexcept -> String {
+YAGE_NODISCARD static auto SystemErrorMessage(int32_t errorCode) noexcept -> String {
     char16_t buffer[2048];
     DWORD    charCount;
 
