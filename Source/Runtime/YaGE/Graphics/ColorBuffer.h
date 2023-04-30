@@ -100,11 +100,19 @@ public:
     /// @brief
     ///   Get unordered access view CPU descriptor handle of this color buffer.
     /// @note
-    ///   Multi-sample color buffers and swap chain back buffers doesn't have unordered access view. But it is guaranteed that other color buffers have unordered access view. You could only access mipmap level 0 via this unordered access view if mip-map is enabled.
+    ///   Multi-sample color buffers and swap chain back buffers doesn't have unordered access view. But it is guaranteed that other color buffers have unordered access view if the pixel format supports unordered access. You could only access mipmap level 0 via this unordered access view if mip-map is enabled.
     ///
     /// @return CpuDescriptorHandle
     ///   Return unordered access view CPU descriptor handle of this color buffer.
     YAGE_NODISCARD auto UnorderedAccessView() const noexcept -> CpuDescriptorHandle { return uav; }
+
+    /// @brief
+    ///   Check if this color buffer supports unordered access.
+    ///
+    /// @return bool
+    /// @retval true    This color buffer supports unordered access.
+    /// @retval false   This color buffer doesn't support unordered access.
+    YAGE_NODISCARD auto SupportUnorderedAccess() const noexcept -> bool { return !uav.IsNull(); }
 
     friend class SwapChain;
 

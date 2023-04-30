@@ -712,6 +712,119 @@ auto YaGE::CommandBuffer::SetRenderTarget(ColorBuffer &renderTarget) noexcept ->
     commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 }
 
+auto YaGE::CommandBuffer::SetRenderTarget(ColorBuffer &renderTarget, DepthBuffer &depthTarget) noexcept -> void {
+    D3D12_RESOURCE_BARRIER barriers[2];
+    uint32_t               barrierCount = 0;
+
+    if (!(renderTarget.State() & D3D12_RESOURCE_STATE_RENDER_TARGET)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = renderTarget.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = renderTarget.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        renderTarget.usageState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrierCount += 1;
+    }
+
+    if (!(depthTarget.State() & D3D12_RESOURCE_STATE_DEPTH_WRITE)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = depthTarget.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = depthTarget.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+        depthTarget.usageState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrierCount += 1;
+    }
+
+    if (barrierCount > 0)
+        commandList->ResourceBarrier(barrierCount, barriers);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = renderTarget.RenderTargetView();
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = depthTarget.DepthStencilView();
+
+    commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+}
+
+auto YaGE::CommandBuffer::SetRenderTarget(DepthBuffer &depthTarget) noexcept -> void {
+    if (!(depthTarget.State() & D3D12_RESOURCE_STATE_DEPTH_WRITE))
+        this->Transition(depthTarget, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = depthTarget.DepthStencilView();
+    commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+}
+
+auto YaGE::CommandBuffer::SetRenderTargets(uint32_t count, ColorBuffer **renderTargets) noexcept -> void {
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[8];
+    D3D12_RESOURCE_BARRIER      barriers[8];
+    uint32_t                    barrierCount = 0;
+
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!(renderTargets[i]->State() & D3D12_RESOURCE_STATE_RENDER_TARGET)) {
+            barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barriers[barrierCount].Transition.pResource   = renderTargets[i]->resource.Get();
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            barriers[barrierCount].Transition.StateBefore = renderTargets[i]->State();
+            barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+            renderTargets[i]->usageState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrierCount += 1;
+        }
+
+        rtvs[i] = renderTargets[i]->RenderTargetView();
+    }
+
+    if (barrierCount > 0)
+        commandList->ResourceBarrier(barrierCount, barriers);
+    commandList->OMSetRenderTargets(count, rtvs, FALSE, nullptr);
+}
+
+auto YaGE::CommandBuffer::SetRenderTargets(uint32_t      count,
+                                           ColorBuffer **renderTargets,
+                                           DepthBuffer  &depthTarget) noexcept -> void {
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[9];
+    D3D12_RESOURCE_BARRIER      barriers[8];
+    uint32_t                    barrierCount = 0;
+
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!(renderTargets[i]->State() & D3D12_RESOURCE_STATE_RENDER_TARGET)) {
+            barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barriers[barrierCount].Transition.pResource   = renderTargets[i]->resource.Get();
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            barriers[barrierCount].Transition.StateBefore = renderTargets[i]->State();
+            barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+            renderTargets[i]->usageState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrierCount += 1;
+        }
+
+        rtvs[i] = renderTargets[i]->RenderTargetView();
+    }
+
+    if (!(depthTarget.State() & D3D12_RESOURCE_STATE_DEPTH_WRITE)) {
+        barriers[barrierCount].Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barriers[barrierCount].Transition.pResource   = depthTarget.resource.Get();
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[barrierCount].Transition.StateBefore = depthTarget.State();
+        barriers[barrierCount].Transition.StateAfter  = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+        depthTarget.usageState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrierCount += 1;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = depthTarget.DepthStencilView();
+
+    if (barrierCount > 0)
+        commandList->ResourceBarrier(barrierCount, barriers);
+    commandList->OMSetRenderTargets(count, rtvs, FALSE, &dsv);
+}
+
 auto YaGE::CommandBuffer::SetGraphicsRootSignature(RootSignature &rootSig) noexcept -> void {
     if (graphicsRootSignature == &rootSig)
         return;

@@ -52,7 +52,7 @@ YaGE::ColorBuffer::ColorBuffer(uint32_t    width,
 
         // Enable unordered access if multi-sample is not enabled.
         D3D12_RESOURCE_FLAGS resourceFlags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        if (sampleCount == 1)
+        if (sampleCount == 1 && device.SupportUnorderedAccess(format))
             resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         const D3D12_RESOURCE_DESC desc{
@@ -135,7 +135,7 @@ YaGE::ColorBuffer::ColorBuffer(uint32_t    width,
     }
 
     // Create unordered access view.
-    if (sampleCount == 1) {
+    if (sampleCount == 1 && device.SupportUnorderedAccess(format)) {
         D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
         desc.Format = format;
 

@@ -2,11 +2,9 @@
 #define YAGE_GRAPHICS_COMMAND_BUFFER_H
 
 #include "ColorBuffer.h"
+#include "DepthBuffer.h"
 #include "DynamicDescriptorHeap.h"
 #include "RenderDevice.h"
-
-#include <d3d12.h>
-#include <wrl/client.h>
 
 #include <vector>
 
@@ -179,10 +177,47 @@ public:
     YAGE_API auto SetRenderTarget(ColorBuffer &renderTarget) noexcept -> void;
 
     /// @brief
+    ///   Set a single render target and depth buffer for current pipeline.
+    /// @note
+    ///   State of the specified color buffer and depth buffer will be automatically transitioned if necessary.
+    ///
+    /// @param[in] renderTarget The color buffer to be used as render target.
+    /// @param[in] depthTarget  The depth buffer to be used as depth target.
+    YAGE_API auto SetRenderTarget(ColorBuffer &renderTarget, DepthBuffer &depthTarget) noexcept -> void;
+
+    /// @brief
+    ///   Update depth buffer without rendering to any render target.
+    /// @note
+    ///   State of the specified depth buffer will be automatically transitioned if necessary.
+    ///
+    /// @param[in] depthTarget  The depth buffer to be updated.
+    YAGE_API auto SetRenderTarget(DepthBuffer &depthTarget) noexcept -> void;
+
+    /// @brief
+    ///   Set multiple render targets for current pipeline without depth target.
+    /// @note
+    ///   State of the specified color buffers will be automatically transitioned if necessary.
+    ///
+    /// @param[in] count         Number of render targets. This value should be less than or equal to 8.
+    /// @param[in] renderTargets Array of color buffers to be used as render targets.
+    YAGE_API auto SetRenderTargets(uint32_t count, ColorBuffer **renderTargets) noexcept -> void;
+
+    /// @brief
+    ///   Set multiple render targets and depth buffer for current pipeline.
+    /// @note
+    ///   State of the specified color buffers and depth buffer will be automatically transitioned if necessary.
+    ///
+    /// @param[in] count         Number of render targets.
+    /// @param[in] renderTargets Array of color buffers to be used as render targets.
+    /// @param[in] depthTarget   The depth buffer to be used as depth target.
+    YAGE_API auto SetRenderTargets(uint32_t count, ColorBuffer **renderTargets, DepthBuffer &depthTarget) noexcept
+        -> void;
+
+    /// @brief
     ///   Clear a color buffer to its clear color.
     ///
-    /// @param[in] colorBuffer  The color buffer to be cleared.
-    auto ClearColor(const ColorBuffer &colorBuffer) noexcept -> void {
+    /// @param[in, out] colorBuffer The color buffer to be cleared.
+    auto ClearColor(ColorBuffer &colorBuffer) noexcept -> void {
         const Color &color = colorBuffer.ClearColor();
         commandList->ClearRenderTargetView(colorBuffer.RenderTargetView(), reinterpret_cast<const float *>(&color), 0,
                                            nullptr);
@@ -191,10 +226,70 @@ public:
     /// @brief
     ///   Clear a color buffer to the specified color.
     ///
-    /// @param[in] colorBuffer  The color buffer to be cleared.
-    /// @param[in] color        The color to be used to clear the color buffer.
-    auto ClearColor(const ColorBuffer &colorBuffer, const Color &color) noexcept -> void {
+    /// @param[in, out] colorBuffer The color buffer to be cleared.
+    /// @param[in]      color       The color to be used to clear the color buffer.
+    auto ClearColor(ColorBuffer &colorBuffer, const Color &color) noexcept -> void {
         commandList->ClearRenderTargetView(colorBuffer.RenderTargetView(), reinterpret_cast<const float *>(&color), 0,
+                                           nullptr);
+    }
+
+    /// @brief
+    ///   Clear depth value for the specified depth buffer. Stencil value will not be affected.
+    ///
+    /// @param[in] depthBuffer  The depth buffer to be cleared.
+    auto ClearDepth(DepthBuffer &depthBuffer) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH,
+                                           depthBuffer.ClearDepth(), depthBuffer.ClearStencil(), 0, nullptr);
+    }
+
+    /// @brief
+    ///   Clear depth value for the specified depth buffer. Stencil value will not be affected.
+    ///
+    /// @param[in, out] depthBuffer The depth buffer to be cleared.
+    /// @param          clearDepth  The depth value to be used to clear the depth buffer.
+    auto ClearDepth(DepthBuffer &depthBuffer, float clearDepth) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, clearDepth,
+                                           depthBuffer.ClearStencil(), 0, nullptr);
+    }
+
+    /// @brief
+    ///   Clear stencil value for the specified depth buffer. Depth value will not be affected.
+    ///
+    /// @param[in, out] depthBuffer  The depth buffer to be cleared.
+    auto ClearStencil(DepthBuffer &depthBuffer) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(), D3D12_CLEAR_FLAG_STENCIL,
+                                           depthBuffer.ClearDepth(), depthBuffer.ClearStencil(), 0, nullptr);
+    }
+
+    /// @brief
+    ///   Clear stencil value for the specified depth buffer. Depth value will not be affected.
+    ///
+    /// @param[in, out] depthBuffer  The depth buffer to be cleared.
+    /// @param          stencil      The stencil value to be used to clear the depth buffer.
+    auto ClearStencil(DepthBuffer &depthBuffer, uint8_t stencil) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(), D3D12_CLEAR_FLAG_STENCIL,
+                                           depthBuffer.ClearDepth(), stencil, 0, nullptr);
+    }
+
+    /// @brief
+    ///   Clear depth and stencil value for the specified depth buffer.
+    ///
+    /// @param[in, out] depthBuffer  The depth buffer to be cleared.
+    auto ClearDepthStencil(DepthBuffer &depthBuffer) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(),
+                                           D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depthBuffer.ClearDepth(),
+                                           depthBuffer.ClearStencil(), 0, nullptr);
+    }
+
+    /// @brief
+    ///   Clear depth and stencil value for the specified depth buffer.
+    ///
+    /// @param[in, out] depthBuffer  The depth buffer to be cleared.
+    /// @param          depth        The depth value to be used to clear the depth buffer.
+    /// @param          stencil      The stencil value to be used to clear the depth buffer.
+    auto ClearDepthStencil(DepthBuffer &depthBuffer, float depth, uint8_t stencil) noexcept -> void {
+        commandList->ClearDepthStencilView(depthBuffer.DepthStencilView(),
+                                           D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth, stencil, 0,
                                            nullptr);
     }
 

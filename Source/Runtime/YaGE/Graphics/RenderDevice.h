@@ -234,6 +234,16 @@ public:
     YAGE_NODISCARD YAGE_API auto SupportRayTracing() const noexcept -> bool;
 
     /// @brief
+    ///   Checks if the specified pixel format is supported for unordered access.
+    ///
+    /// @param format   The pixel format to be checked.
+    ///
+    /// @return bool
+    /// @retval true    The specified pixel format is supported for unordered access.
+    /// @retval false   The specified pixel format is not supported for unordered access.
+    YAGE_NODISCARD YAGE_API auto SupportUnorderedAccess(DXGI_FORMAT format) const noexcept -> bool;
+
+    /// @brief
     ///   Get global singleton instance of RenderDevice.
     ///
     /// @return RenderDevice &
