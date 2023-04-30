@@ -29,10 +29,12 @@ int WINAPI WinMain(_In_ HINSTANCE     hInstance,
         Window window(u"Hello Triangle", 800, 600, WindowStyle::Default);
         window.Center();
 
-        SwapChain swapChain(window, 3, DXGI_FORMAT_R8G8B8A8_UNORM, true);
+        SwapChain swapChain(window);
         swapChain.SetClearColor(Color::Azure());
 
-        RootSignature rootSig({}, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        D3D12_ROOT_SIGNATURE_DESC desc{};
+        desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+        RootSignature rootSignature(desc);
 
         CommandBuffer commandBuffer;
 

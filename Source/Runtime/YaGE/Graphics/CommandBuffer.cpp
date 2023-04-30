@@ -523,7 +523,11 @@ YaGE::CommandBuffer::CommandBuffer()
       commandList(),
       allocator(),
       lastSubmitSyncPoint(),
-      tempBufferAllocator() {
+      tempBufferAllocator(),
+      graphicsRootSignature(),
+      computeRootSignature(),
+      dynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
+      dynamicSamplerHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
     // Acquire allocator.
     allocator = renderDevice.AcquireCommandAllocator();
 
@@ -560,6 +564,12 @@ auto YaGE::CommandBuffer::Submit() -> uint64_t {
     // Clean up temp buffer allocator.
     tempBufferAllocator.CleanUp(lastSubmitSyncPoint);
 
+    // Clean up root signature.
+    graphicsRootSignature = nullptr;
+    computeRootSignature  = nullptr;
+    dynamicDescriptorHeap.CleanUp(lastSubmitSyncPoint);
+    dynamicSamplerHeap.CleanUp(lastSubmitSyncPoint);
+
     // Reset allocator.
     renderDevice.FreeCommandAllocator(lastSubmitSyncPoint, allocator);
     allocator = renderDevice.AcquireCommandAllocator();
@@ -573,6 +583,12 @@ auto YaGE::CommandBuffer::Submit() -> uint64_t {
 auto YaGE::CommandBuffer::Reset() -> void {
     commandList->Close();
     tempBufferAllocator.CleanUp(lastSubmitSyncPoint);
+
+    // Clean up root signature.
+    graphicsRootSignature = nullptr;
+    computeRootSignature  = nullptr;
+    dynamicDescriptorHeap.CleanUp(lastSubmitSyncPoint);
+    dynamicSamplerHeap.CleanUp(lastSubmitSyncPoint);
 
     if (allocator == nullptr)
         allocator = renderDevice.AcquireCommandAllocator();
@@ -694,4 +710,52 @@ auto YaGE::CommandBuffer::SetRenderTarget(ColorBuffer &renderTarget) noexcept ->
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = renderTarget.RenderTargetView();
     commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+}
+
+auto YaGE::CommandBuffer::SetGraphicsRootSignature(RootSignature &rootSig) noexcept -> void {
+    if (graphicsRootSignature == &rootSig)
+        return;
+
+    graphicsRootSignature = &rootSig;
+    dynamicDescriptorHeap.ParseGraphicsRootSignature(rootSig);
+    dynamicSamplerHeap.ParseGraphicsRootSignature(rootSig);
+    commandList->SetGraphicsRootSignature(rootSig.D3D12RootSignature());
+}
+
+auto YaGE::CommandBuffer::SetComputeRootSignature(RootSignature &rootSig) noexcept -> void {
+    if (computeRootSignature == &rootSig)
+        return;
+
+    computeRootSignature = &rootSig;
+    dynamicDescriptorHeap.ParseComputeRootSignature(rootSig);
+    dynamicSamplerHeap.ParseComputeRootSignature(rootSig);
+    commandList->SetComputeRootSignature(rootSig.D3D12RootSignature());
+}
+
+auto YaGE::CommandBuffer::SetGraphicsConstantBuffer(uint32_t rootParam, const void *data, size_t size) -> void {
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+    commandList->SetGraphicsRootConstantBufferView(rootParam, allocation.gpuAddress);
+}
+
+auto YaGE::CommandBuffer::SetGraphicsConstantBuffer(uint32_t rootParam, uint32_t offset, const void *data, size_t size)
+    -> void {
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+    D3D12_CONSTANT_BUFFER_VIEW_DESC desc{allocation.gpuAddress, static_cast<UINT>(allocation.size)};
+    dynamicDescriptorHeap.BindGraphicsDescriptor(rootParam, offset, desc);
+}
+
+auto YaGE::CommandBuffer::SetComputeConstantBuffer(uint32_t rootParam, const void *data, size_t size) -> void {
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+    commandList->SetComputeRootConstantBufferView(rootParam, allocation.gpuAddress);
+}
+
+auto YaGE::CommandBuffer::SetComputeConstantBuffer(uint32_t rootParam, uint32_t offset, const void *data, size_t size)
+    -> void {
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+    D3D12_CONSTANT_BUFFER_VIEW_DESC desc{allocation.gpuAddress, static_cast<UINT>(allocation.size)};
+    dynamicDescriptorHeap.BindComputeDescriptor(rootParam, offset, desc);
 }

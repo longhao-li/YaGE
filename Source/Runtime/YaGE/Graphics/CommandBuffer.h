@@ -2,6 +2,7 @@
 #define YAGE_GRAPHICS_COMMAND_BUFFER_H
 
 #include "ColorBuffer.h"
+#include "DynamicDescriptorHeap.h"
 #include "RenderDevice.h"
 
 #include <d3d12.h>
@@ -197,6 +198,168 @@ public:
                                            nullptr);
     }
 
+    /// @brief
+    ///   Set graphics root signature of this command buffer.
+    ///
+    /// @param[in] rootSig  The graphics root signature to be used by this command buffer.
+    YAGE_API auto SetGraphicsRootSignature(RootSignature &rootSig) noexcept -> void;
+
+    /// @brief
+    ///   Set compute root signature of this command buffer.
+    ///
+    /// @param[in] rootSig  The compute root signature to be used by this command buffer.
+    YAGE_API auto SetComputeRootSignature(RootSignature &rootSig) noexcept -> void;
+
+    /// @brief
+    ///   Set a non-sampler graphics descriptor table descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param descriptor   The descriptor to be set.
+    auto SetGraphicsDescriptor(uint32_t rootParam, uint32_t offset, CpuDescriptorHandle descriptor) noexcept -> void {
+        dynamicDescriptorHeap.BindGraphicsDescriptor(rootParam, offset, descriptor);
+    }
+
+    /// @brief
+    ///   Set a sampler graphics descriptor table descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param descriptor   The descriptor to be set.
+    auto SetGraphicsSampler(uint32_t rootParam, uint32_t offset, CpuDescriptorHandle descriptor) noexcept -> void {
+        dynamicSamplerHeap.BindGraphicsDescriptor(rootParam, offset, descriptor);
+    }
+
+    /// @brief
+    ///   Set graphics root constant.
+    ///
+    /// @param rootParam    The root parameter index of the constant value.
+    /// @param offset       Offset of the constant.
+    /// @param value        The value to be set.
+    template <typename T>
+    auto SetGraphicsConstant(uint32_t rootParam, uint32_t offset, const T &value) noexcept -> void {
+        static_assert(sizeof(T) == sizeof(uint32_t), "Element must be actually 4 bytes in size.");
+        static_assert(std::is_trivially_copyable<T>::value, "Element must be trivially copyable.");
+
+        commandList->SetGraphicsRoot32BitConstant(rootParam, *reinterpret_cast<const UINT *>(std::addressof(value)),
+                                                  offset);
+    }
+
+    /// @brief
+    ///   Set graphics root constant based on the specified offset.
+    ///
+    /// @param rootParam    The root parameter index of the constant value.
+    /// @param baseOffset   Base offset of the first constant.
+    /// @param value        The first value to be set.
+    /// @param others       The rest values to be set.
+    template <typename T, typename... Others>
+    auto SetGraphicsConstant(uint32_t rootParam, uint32_t baseOffset, const T &value, const Others &...others) noexcept
+        -> void {
+        static_assert(sizeof(T) == sizeof(uint32_t), "Elements must be actually 4 bytes in size.");
+        static_assert(std::is_trivially_copyable<T>::value, "Elements must be trivially copyable.");
+
+        this->SetGraphicsConstant(rootParam, baseOffset, value);
+        this->SetGraphicsConstant(rootParam, baseOffset + 1, others...);
+    }
+
+    /// @brief
+    ///   Copy data and set a constant buffer view of the specified root descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor.
+    /// @param data         The data to be copied.
+    /// @param size         Size in byte of the data to be copied.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetGraphicsConstantBuffer(uint32_t rootParam, const void *data, size_t size) -> void;
+
+    /// @brief
+    ///   Copy data and set a constant buffer view of the specified root descriptor table.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param data         The data to be copied.
+    /// @param size         Size in byte of the data to be copied.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetGraphicsConstantBuffer(uint32_t rootParam, uint32_t offset, const void *data, size_t size) -> void;
+
+    /// @brief
+    ///   Set a non-sampler compute descriptor table descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param descriptor   The descriptor to be set.
+    auto SetComputeDescriptor(uint32_t rootParam, uint32_t offset, CpuDescriptorHandle descriptor) noexcept -> void {
+        dynamicDescriptorHeap.BindComputeDescriptor(rootParam, offset, descriptor);
+    }
+
+    /// @brief
+    ///   Set a sampler compute descriptor table descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param descriptor   The descriptor to be set.
+    auto SetComputeSampler(uint32_t rootParam, uint32_t offset, CpuDescriptorHandle descriptor) noexcept -> void {
+        dynamicSamplerHeap.BindComputeDescriptor(rootParam, offset, descriptor);
+    }
+
+    /// @brief
+    ///   Set compute root constant.
+    ///
+    /// @param rootParam    The root parameter index of the constant value.
+    /// @param offset       Offset of the constant.
+    /// @param value        The value to be set.
+    template <typename T>
+    auto SetComputeConstant(uint32_t rootParam, uint32_t offset, const T &value) noexcept -> void {
+        static_assert(sizeof(T) == sizeof(uint32_t), "Element must be actually 4 bytes in size.");
+        static_assert(std::is_trivially_copyable<T>::value, "Element must be trivially copyable.");
+
+        commandList->SetComputeRoot32BitConstant(rootParam, *reinterpret_cast<const UINT *>(std::addressof(value)),
+                                                 offset);
+    }
+
+    /// @brief
+    ///   Set compute root constant based on the specified offset.
+    ///
+    /// @param rootParam    The root parameter index of the constant value.
+    /// @param baseOffset   Base offset of the first constant.
+    /// @param value        The first value to be set.
+    /// @param others       The rest values to be set.
+    template <typename T, typename... Others>
+    auto SetComputeConstant(uint32_t rootParam, uint32_t baseOffset, const T &value, const Others &...others) noexcept
+        -> void {
+        static_assert(sizeof(T) == sizeof(uint32_t), "Elements must be actually 4 bytes in size.");
+        static_assert(std::is_trivially_copyable<T>::value, "Elements must be trivially copyable.");
+
+        this->SetComputeConstant(rootParam, baseOffset, value);
+        this->SetComputeConstant(rootParam, baseOffset + 1, others...);
+    }
+
+    /// @brief
+    ///   Copy data and set a constant buffer view of the specified root descriptor.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor.
+    /// @param data         The data to be copied.
+    /// @param size         Size in byte of the data to be copied.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetComputeConstantBuffer(uint32_t rootParam, const void *data, size_t size) -> void;
+
+    /// @brief
+    ///   Copy data and set a constant buffer view of the specified root descriptor table.
+    ///
+    /// @param rootParam    The root parameter index of the descriptor table.
+    /// @param offset       Offset of the descriptor in the descriptor table.
+    /// @param data         The data to be copied.
+    /// @param size         Size in byte of the data to be copied.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetComputeConstantBuffer(uint32_t rootParam, uint32_t offset, const void *data, size_t size) -> void;
+
 private:
     /// @brief  The render device that is used to create this command buffer.
     RenderDevice &renderDevice;
@@ -212,6 +375,18 @@ private:
 
     /// @brief  Temp buffer allocator that is used to allocate temporary upload and unordered access buffers.
     TempBufferAllocator tempBufferAllocator;
+
+    /// @brief  Current graphics root signature.
+    RootSignature *graphicsRootSignature;
+
+    /// @brief  Current compute root signature.
+    RootSignature *computeRootSignature;
+
+    /// @brief  Dynamic non-sampler descriptor heap.
+    DynamicDescriptorHeap dynamicDescriptorHeap;
+
+    /// @brief  Dynamic sampler descriptor heap.
+    DynamicDescriptorHeap dynamicSamplerHeap;
 };
 
 } // namespace YaGE
