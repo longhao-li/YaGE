@@ -32,7 +32,7 @@ public:
 
     /// @brief
     ///   Deprecated. This method doesn't return any useful message. Use @p Message() instead.
-    [[deprecated]] auto what() const noexcept -> const char * override;
+    YAGE_DEPRECATED auto what() const noexcept -> const char * override;
 
     /// @brief
     ///   Get the error message of this exception.
