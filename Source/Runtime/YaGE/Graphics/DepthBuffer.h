@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_DEPTH_BUFFER_H
-#define YAGE_GRAPHICS_DEPTH_BUFFER_H
+#pragma once
 
 #include "Descriptor.h"
 #include "PixelBuffer.h"
@@ -108,5 +107,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_DEPTH_BUFFER_H

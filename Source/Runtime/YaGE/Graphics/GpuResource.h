@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_GPU_RESOURCE_H
-#define YAGE_GRAPHICS_GPU_RESOURCE_H
+#pragma once
 
 #include "../Core/Common.h"
 
@@ -70,5 +69,3 @@ protected:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_GPU_RESOURCE_H

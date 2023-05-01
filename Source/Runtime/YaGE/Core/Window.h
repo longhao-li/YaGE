@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_WINDOW_H
-#define YAGE_CORE_WINDOW_H
+#pragma once
 
 #include "String.h"
 
@@ -217,5 +216,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_CORE_WINDOW_H

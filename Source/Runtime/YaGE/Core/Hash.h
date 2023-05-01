@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_HASH_H
-#define YAGE_CORE_HASH_H
+#pragma once
 
 #include "Common.h"
 
@@ -58,5 +57,3 @@ YAGE_NODISCARD YAGE_FORCEINLINE auto Hash(const void *data, size_t size, size_t 
 }
 
 } // namespace YaGE
-
-#endif // YAGE_CORE_HASH_H

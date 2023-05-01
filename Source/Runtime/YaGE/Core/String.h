@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_STRING_H
-#define YAGE_CORE_STRING_H
+#pragma once
 
 #include "StringView.h"
 
@@ -921,5 +920,3 @@ struct fmt::formatter<YaGE::String, char16_t> : fmt::formatter<fmt::basic_string
         return fmt::formatter<fmt::basic_string_view<char16_t>, char16_t>::format({str.Data(), str.Length()}, ctx);
     }
 };
-
-#endif // YAGE_CORE_STRING_H

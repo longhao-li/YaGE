@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_COLOR_H
-#define YAGE_GRAPHICS_COLOR_H
+#pragma once
 
 #include "../Core/Common.h"
 
@@ -529,5 +528,3 @@ struct Color {
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_COLOR_H

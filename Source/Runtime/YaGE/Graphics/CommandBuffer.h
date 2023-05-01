@@ -1,12 +1,11 @@
-#ifndef YAGE_GRAPHICS_COMMAND_BUFFER_H
-#define YAGE_GRAPHICS_COMMAND_BUFFER_H
+#pragma once
 
 #include "ColorBuffer.h"
 #include "DepthBuffer.h"
 #include "DynamicDescriptorHeap.h"
+#include "GpuBuffer.h"
+#include "PipelineState.h"
 #include "RenderDevice.h"
-
-#include <vector>
 
 namespace YaGE {
 
@@ -455,6 +454,217 @@ public:
     ///   Thrown if failed to allocate temporary upload buffer.
     YAGE_API auto SetComputeConstantBuffer(uint32_t rootParam, uint32_t offset, const void *data, size_t size) -> void;
 
+    /// @brief
+    ///   Set a vertex buffer to the specified slot.
+    ///
+    /// @param slot         The slot to set the vertex buffer.
+    /// @param gpuAddress   The GPU address of the start of the vertex buffer.
+    /// @param vertexCount  Number of vertices.
+    /// @param stride       Stride size in byte of each vertex.
+    auto SetVertexBuffer(uint32_t slot, uint64_t gpuAddress, uint32_t vertexCount, uint32_t stride) noexcept -> void {
+        const D3D12_VERTEX_BUFFER_VIEW vbv{
+            /* BufferLocation = */ gpuAddress,
+            /* SizeInBytes    = */ vertexCount * stride,
+            /* StrideInBytes  = */ stride,
+        };
+        commandList->IASetVertexBuffers(slot, 1, &vbv);
+    }
+
+    /// @brief
+    ///   Use a structured buffer as vertex buffer.
+    ///
+    /// @param slot         The slot to set the vertex buffer.
+    /// @param buffer       The structured buffer to be set.
+    auto SetVertexBuffer(uint32_t slot, const StructuredBuffer &buffer) noexcept -> void {
+        const D3D12_VERTEX_BUFFER_VIEW vbv{
+            /* BufferLocation = */ buffer.GpuAddress(),
+            /* SizeInBytes    = */ buffer.ElementSize() * buffer.ElementCount(),
+            /* StrideInBytes  = */ buffer.ElementSize(),
+        };
+
+        commandList->IASetVertexBuffers(slot, 1, &vbv);
+    }
+
+    /// @brief
+    ///   Use a temporary upload buffer as vertex buffer.
+    /// @note
+    ///   It is slow to upload vertex data to GPU for each frame. Please consider using static vertex buffer if possible.
+    ///
+    /// @param     slot         The slot to set the vertex buffer.
+    /// @param[in] data         The vertex data to be copied.
+    /// @param     vertexCount  Number of vertices to be copied.
+    /// @param     stride       Stride size in byte of each vertex.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetVertexBuffer(uint32_t slot, const void *data, uint32_t vertexCount, uint32_t stride) -> void;
+
+    /// @brief
+    ///   Set index buffer for current draw call.
+    ///
+    /// @param gpuAddress   The GPU address of the start of the index buffer.
+    /// @param indexCount   Number of indices.
+    /// @param isUInt16     Specifies whether indices are uint16 or uint32.
+    auto SetIndexBuffer(uint64_t gpuAddress, uint32_t indexCount, bool isUInt16) noexcept -> void {
+        const DXGI_FORMAT             format = isUInt16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+        const D3D12_INDEX_BUFFER_VIEW ibv{
+            /* BufferLocation = */ gpuAddress,
+            /* SizeInBytes    = */ indexCount * (isUInt16 ? 2U : 4U),
+            /* Format         = */ format,
+        };
+
+        commandList->IASetIndexBuffer(&ibv);
+    }
+
+    /// @brief
+    ///   Use a structured buffer as index buffer.
+    /// @remarks
+    ///   Index type is determined by element size of the structured buffer.
+    ///
+    /// @param[in] buffer   The structured buffer to be set.
+    auto SetIndexBuffer(const StructuredBuffer &buffer) noexcept -> void {
+        const DXGI_FORMAT             format = buffer.ElementSize() == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+        const D3D12_INDEX_BUFFER_VIEW ibv{
+            /* BufferLocation = */ buffer.GpuAddress(),
+            /* SizeInBytes    = */ buffer.ElementSize() * buffer.ElementCount(),
+            /* Format         = */ format,
+        };
+
+        commandList->IASetIndexBuffer(&ibv);
+    }
+
+    /// @brief
+    ///   Use a temporary upload buffer as index buffer.
+    /// @note
+    ///   It is slow to upload index data to GPU for each frame. Please consider using static index buffer if possible.
+    ///
+    /// @param[in] data         The index data to be copied.
+    /// @param     indexCount   Number of indices to be copied.
+    /// @param     isUInt16     Specifies whether indices are uint16 or uint32.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto SetIndexBuffer(const void *data, uint32_t indexCount, bool isUInt16) -> void;
+
+    /// @brief
+    ///   Set pipeline state for this command buffer.
+    /// @note
+    ///   Root signatures will not be affected by this method. You must set root signature manually.
+    ///
+    /// @param pipelineState   The pipeline state to be set.
+    auto SetPipelineState(const PipelineState &pso) noexcept -> void {
+        commandList->SetPipelineState(pso.D3D12PipelineState());
+    }
+
+    /// @brief
+    ///   Set primitive topology for current draw call.
+    ///
+    /// @param topology   Primitive topology for current draw call.
+    auto SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept -> void {
+        commandList->IASetPrimitiveTopology(topology);
+    }
+
+    /// @brief
+    ///   Set viewport for current draw call.
+    /// @remarks
+    ///   D3D12 screen coordinate starts from top-left corner of screen.
+    ///
+    /// @param x        X coordinate from top-left corner of this viewport.
+    /// @param y        Y coordinate from top-left corner of this viewport.
+    /// @param width    Width of this viewport.
+    /// @param height   Height of this viewport.
+    /// @param zNear    Minimum depth of this viewport.
+    /// @param zFar     Maximum depth of this viewport.
+    template <typename X, typename Y, typename Width, typename Height>
+    auto SetViewport(X x, Y y, Width width, Height height, float zNear = 0.0f, float zFar = 1.0f) noexcept -> void {
+        static_assert(std::is_arithmetic<X>::value, "X must be arithmetic type.");
+        static_assert(std::is_arithmetic<Y>::value, "Y must be arithmetic type.");
+        static_assert(std::is_arithmetic<Width>::value, "Width must be arithmetic type.");
+        static_assert(std::is_arithmetic<Height>::value, "Height must be arithmetic type.");
+
+        const D3D12_VIEWPORT viewport{
+            /* TopLeftX = */ static_cast<float>(x),
+            /* TopLeftY = */ static_cast<float>(y),
+            /* Width    = */ static_cast<float>(width),
+            /* Height   = */ static_cast<float>(height),
+            /* MinDepth = */ zNear,
+            /* MaxDepth = */ zFar,
+        };
+
+        commandList->RSSetViewports(1, &viewport);
+    }
+
+    /// @brief
+    ///   Set viewports for current draw call.
+    /// @remarks
+    ///   D3D12 screen coordinate starts from top-left corner of screen.
+    ///
+    /// @param count      Number of viewports to be set.
+    /// @param viewports  Array of viewports to be set.
+    auto SetViewports(uint32_t count, const D3D12_VIEWPORT *viewports) noexcept -> void {
+        commandList->RSSetViewports(count, viewports);
+    }
+
+    /// @brief
+    ///   Set scissor rectangle for current draw call.
+    /// @remarks
+    ///   D3D12 screen coordinate starts from top-left corner of screen.
+    ///
+    /// @param x        X coordinate from top-left corner of this scissor rectangle.
+    /// @param y        Y coordinate from top-left corner of this scissor rectangle.
+    /// @param width    Width of this scissor rectangle.
+    /// @param height   Height of this scissor rectangle.
+    template <typename X, typename Y, typename Width, typename Height>
+    auto SetScissorRect(X x, Y y, Width width, Height height) noexcept -> void {
+        static_assert(std::is_arithmetic<X>::value, "X must be arithmetic type.");
+        static_assert(std::is_arithmetic<Y>::value, "Y must be arithmetic type.");
+        static_assert(std::is_arithmetic<Width>::value, "Width must be arithmetic type.");
+        static_assert(std::is_arithmetic<Height>::value, "Height must be arithmetic type.");
+
+        const D3D12_RECT rect{
+            /* left   = */ static_cast<LONG>(x),
+            /* top    = */ static_cast<LONG>(y),
+            /* right  = */ static_cast<LONG>(x + width),
+            /* bottom = */ static_cast<LONG>(y + height),
+        };
+
+        commandList->RSSetScissorRects(1, &rect);
+    }
+
+    /// @brief
+    ///   Set scissor rectangles for current draw call.
+    /// @remarks
+    ///   D3D12 screen coordinate starts from top-left corner of screen.
+    ///
+    /// @param numRects   Number of scissor rectangles.
+    /// @param rects      Array of scissor rectangles.
+    auto SetScissorRects(uint32_t numRects, const D3D12_RECT *rects) noexcept -> void {
+        commandList->RSSetScissorRects(numRects, rects);
+    }
+
+    /// @brief
+    ///   Draw primitives.
+    ///
+    /// @param vertexCount   Number of vertices to be drawn.
+    /// @param firstVertex   Index of the first vertex to be drawn.
+    auto Draw(uint32_t vertexCount, uint32_t firstVertex = 0) noexcept -> void {
+        dynamicDescriptorHeap.Commit(commandList.Get());
+        dynamicSamplerHeap.Commit(commandList.Get());
+        commandList->DrawInstanced(vertexCount, 1, firstVertex, 0);
+    }
+
+    /// @brief
+    ///   Draw primitives according to index buffer.
+    ///
+    /// @param indexCount    Number of indices to be drawn.
+    /// @param firstIndex    Index of the first index in index buffer.
+    /// @param firstVertex   Index of the first vertex to be drawn.
+    auto DrawIndexed(uint32_t indexCount, uint32_t firstIndex, uint32_t firstVertex = 0) noexcept -> void {
+        dynamicDescriptorHeap.Commit(commandList.Get());
+        dynamicSamplerHeap.Commit(commandList.Get());
+        commandList->DrawIndexedInstanced(indexCount, 1, firstIndex, firstVertex, 0);
+    }
+
 private:
     /// @brief  The render device that is used to create this command buffer.
     RenderDevice &renderDevice;
@@ -485,5 +695,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_COMMAND_BUFFER_H

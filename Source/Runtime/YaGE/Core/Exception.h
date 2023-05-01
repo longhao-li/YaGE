@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_EXCEPTION_H
-#define YAGE_CORE_EXCEPTION_H
+#pragma once
 
 #include "String.h"
 
@@ -118,5 +117,3 @@ public:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_CORE_EXCEPTION_H

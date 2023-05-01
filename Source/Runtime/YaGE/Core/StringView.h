@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_STRING_VIEW_H
-#define YAGE_CORE_STRING_VIEW_H
+#pragma once
 
 #include "Hash.h"
 
@@ -622,5 +621,3 @@ struct fmt::formatter<YaGE::StringView, char16_t> : fmt::formatter<fmt::basic_st
         return fmt::formatter<fmt::basic_string_view<char16_t>, char16_t>::format({str.Data(), str.Length()}, ctx);
     }
 };
-
-#endif // YAGE_CORE_STRING_VIEW_H

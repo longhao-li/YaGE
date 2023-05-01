@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_ROOT_SIGNATURE_H
-#define YAGE_GRAPHICS_ROOT_SIGNATURE_H
+#pragma once
 
 #include "../Core/Common.h"
 
@@ -131,5 +130,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_ROOT_SIGNATURE_H

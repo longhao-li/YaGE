@@ -1,11 +1,8 @@
-#ifndef YAGE_GRAPHICS_RENDER_DEVICE_H
-#define YAGE_GRAPHICS_RENDER_DEVICE_H
+#pragma once
 
 #include "Descriptor.h"
 
-#include <d3d12.h>
 #include <dxgi1_6.h>
-#include <wrl/client.h>
 
 #include <atomic>
 #include <memory>
@@ -297,5 +294,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_RENDER_DEVICE_H

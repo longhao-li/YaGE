@@ -872,3 +872,31 @@ auto YaGE::CommandBuffer::SetComputeConstantBuffer(uint32_t rootParam, uint32_t 
     D3D12_CONSTANT_BUFFER_VIEW_DESC desc{allocation.gpuAddress, static_cast<UINT>(allocation.size)};
     dynamicDescriptorHeap.BindComputeDescriptor(rootParam, offset, desc);
 }
+
+auto YaGE::CommandBuffer::SetVertexBuffer(uint32_t slot, const void *data, uint32_t vertexCount, uint32_t stride)
+    -> void {
+    const size_t         size = size_t(vertexCount) * stride;
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+
+    const D3D12_VERTEX_BUFFER_VIEW vbv{
+        /* BufferLocation = */ allocation.gpuAddress,
+        /* SizeInBytes    = */ static_cast<UINT>(size),
+        /* StrideInBytes  = */ stride,
+    };
+    commandList->IASetVertexBuffers(slot, 1, &vbv);
+}
+
+auto YaGE::CommandBuffer::SetIndexBuffer(const void *data, uint32_t indexCount, bool isUInt16) -> void {
+    const size_t         size = size_t(indexCount) * (isUInt16 ? 2U : 4U);
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
+    memcpy(allocation.data, data, size);
+
+    const D3D12_INDEX_BUFFER_VIEW ibv{
+        /* BufferLocation = */ allocation.gpuAddress,
+        /* SizeInBytes    = */ static_cast<UINT>(size),
+        /* Format         = */ isUInt16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT,
+    };
+
+    commandList->IASetIndexBuffer(&ibv);
+}

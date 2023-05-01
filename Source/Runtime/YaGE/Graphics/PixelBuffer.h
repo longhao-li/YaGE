@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_PIXEL_BUFFER_H
-#define YAGE_GRAPHICS_PIXEL_BUFFER_H
+#pragma once
 
 #include "GpuResource.h"
 
@@ -94,5 +93,3 @@ protected:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_PIXEL_BUFFER_H

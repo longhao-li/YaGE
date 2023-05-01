@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_SWAP_CHAIN_H
-#define YAGE_GRAPHICS_SWAP_CHAIN_H
+#pragma once
 
 #include "ColorBuffer.h"
 #include "RenderDevice.h"
@@ -143,5 +142,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_SWAP_CHAIN_H

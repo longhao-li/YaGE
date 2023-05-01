@@ -1,5 +1,4 @@
-#ifndef YAGE_GRAPHICS_DYNAMIC_DESCRIPTOR_HEAP_H
-#define YAGE_GRAPHICS_DYNAMIC_DESCRIPTOR_HEAP_H
+#pragma once
 
 #include "Descriptor.h"
 #include "RootSignature.h"
@@ -157,5 +156,3 @@ private:
 };
 
 } // namespace YaGE
-
-#endif // YAGE_GRAPHICS_DYNAMIC_DESCRIPTOR_HEAP_H

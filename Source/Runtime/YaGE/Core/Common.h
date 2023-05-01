@@ -1,5 +1,4 @@
-#ifndef YAGE_CORE_COMMON_H
-#define YAGE_CORE_COMMON_H
+#pragma once
 
 #ifdef YAGE_DLL
 #    ifdef YAGE_BUILD_DLL
@@ -68,5 +67,3 @@
 #else
 #    define YAGE_FORCEINLINE inline
 #endif
-
-#endif // YAGE_CORE_COMMON_H
