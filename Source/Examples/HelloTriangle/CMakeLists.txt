@@ -28,3 +28,12 @@ target_compile_definitions(${YAGE_TARGET_NAME} PRIVATE "WIN32_LEAN_AND_MEAN" "_C
 
 # Link libraries.
 target_link_libraries(${YAGE_TARGET_NAME} PRIVATE "YaGE")
+
+# Compile shaders
+include(dxc)
+
+YaGEAddGraphicsShaderTarget(
+    "HelloTriangleShader"
+    VERTEX "HelloTriangle.hlsl"
+    PIXEL "HelloTriangle.hlsl"
+)
