@@ -525,6 +525,8 @@ struct Color {
     YAGE_NODISCARD static constexpr auto Thistle() noexcept -> Color {
         return {0.8470588235294118f, 0.7490196078431373f, 0.8470588235294118f, 1.0f};
     }
+
+    YAGE_NODISCARD static constexpr auto Green() noexcept -> Color { return {0.0f, 1.0f, 0.0f, 1.0f}; }
 };
 
 } // namespace YaGE

@@ -121,6 +121,20 @@ public:
     YAGE_NODISCARD auto IsClosed() const noexcept -> bool { return hWnd == nullptr; }
 
     /// @brief
+    ///   Get client width of this window.
+    ///
+    /// @return uint32_t
+    ///   Return client width of this window.
+    YAGE_NODISCARD auto ClientWidth() const noexcept -> uint32_t { return clientWidth; }
+
+    /// @brief
+    ///   Get client height of this window.
+    ///
+    /// @return uint32_t
+    ///   Return client height of this window.
+    YAGE_NODISCARD auto ClientHeight() const noexcept -> uint32_t { return clientHeight; }
+
+    /// @brief
     ///   Resize client area of this window.
     ///
     /// @param width    New client width.

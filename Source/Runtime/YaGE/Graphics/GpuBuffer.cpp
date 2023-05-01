@@ -45,6 +45,8 @@ YaGE::GpuBuffer::GpuBuffer(size_t size) : GpuResource(), bufferSize(), address()
                                                               IID_PPV_ARGS(resource.GetAddressOf()));
         if (FAILED(hr))
             throw RenderAPIException(hr, u"Failed to create ID3D12Resource for GpuBuffer.");
+
+        this->address = resource->GetGPUVirtualAddress();
     }
 
     { // Create byte address unordered access view.
