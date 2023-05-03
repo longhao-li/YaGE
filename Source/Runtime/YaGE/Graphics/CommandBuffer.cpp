@@ -709,7 +709,7 @@ auto YaGE::CommandBuffer::CopyTexture(uint32_t     width,
                                       uint32_t     height,
                                       DXGI_FORMAT  srcFormat,
                                       const void  *src,
-                                      uint32_t     srcRowPitch,
+                                      size_t       srcRowPitch,
                                       PixelBuffer &dest,
                                       uint32_t     mipLevel) -> void {
     // No such mipmap level. Do nothing.
