@@ -2,6 +2,7 @@
 #include "../Core/Exception.h"
 #include "RenderDevice.h"
 
+#include <cassert>
 #include <mutex>
 #include <queue>
 #include <stack>
@@ -702,6 +703,55 @@ auto YaGE::CommandBuffer::CopyBuffer(const void *src, GpuResource &dest, size_t 
     TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(size));
     memcpy(allocation.data, src, size);
     CopyBuffer(*allocation.resource, allocation.offset, dest, destOffset, size);
+}
+
+auto YaGE::CommandBuffer::CopyTexture(uint32_t     width,
+                                      uint32_t     height,
+                                      DXGI_FORMAT  srcFormat,
+                                      const void  *src,
+                                      uint32_t     srcRowPitch,
+                                      PixelBuffer &dest,
+                                      uint32_t     mipLevel) -> void {
+    // No such mipmap level. Do nothing.
+    if (mipLevel >= dest.MipLevels())
+        return;
+
+    // Align up row pitch.
+    const uint32_t       rowPitch  = (srcRowPitch + 255) & ~uint32_t(255);
+    const size_t         allocSize = (size_t(height) * rowPitch + 511) & ~size_t(511);
+    TempBufferAllocation allocation(tempBufferAllocator.AllocateUploadBuffer(allocSize));
+
+    { // Copy data to temp upload buffer.
+        uint8_t       *buffer = static_cast<uint8_t *>(allocation.data);
+        const uint8_t *srcPtr = static_cast<const uint8_t *>(src);
+        for (uint32_t i = 0; i < height; ++i) {
+            memcpy(buffer, srcPtr, srcRowPitch);
+            buffer += rowPitch;
+            srcPtr += srcRowPitch;
+        }
+    }
+
+    // Transition resource state if necessary.
+    if (!(dest.State() & D3D12_RESOURCE_STATE_COPY_DEST))
+        this->Transition(dest, D3D12_RESOURCE_STATE_COPY_DEST);
+
+    // Copy data to texture.
+    D3D12_TEXTURE_COPY_LOCATION srcLocation;
+    srcLocation.pResource                          = allocation.resource->resource.Get();
+    srcLocation.Type                               = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLocation.PlacedFootprint.Offset             = allocation.offset;
+    srcLocation.PlacedFootprint.Footprint.Format   = srcFormat;
+    srcLocation.PlacedFootprint.Footprint.Width    = width;
+    srcLocation.PlacedFootprint.Footprint.Height   = height;
+    srcLocation.PlacedFootprint.Footprint.Depth    = 1;
+    srcLocation.PlacedFootprint.Footprint.RowPitch = rowPitch;
+
+    D3D12_TEXTURE_COPY_LOCATION destLocation;
+    destLocation.pResource        = dest.resource.Get();
+    destLocation.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    destLocation.SubresourceIndex = mipLevel;
+
+    commandList->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, nullptr);
 }
 
 auto YaGE::CommandBuffer::SetRenderTarget(ColorBuffer &renderTarget) noexcept -> void {

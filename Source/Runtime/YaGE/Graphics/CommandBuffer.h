@@ -6,6 +6,7 @@
 #include "GpuBuffer.h"
 #include "PipelineState.h"
 #include "RenderDevice.h"
+#include "Texture.h"
 
 namespace YaGE {
 
@@ -166,6 +167,27 @@ public:
     /// @throw RenderAPIException
     ///   Thrown if failed to allocate temporary upload buffer.
     YAGE_API auto CopyBuffer(const void *src, GpuResource &dest, size_t destOffset, size_t size) -> void;
+
+    /// @brief
+    ///   Copy data from system memory to texture.
+    ///
+    /// @param      width       Width of the source image.
+    /// @param      height      Height of the source image.
+    /// @param      srcFormat   Format of the source image.
+    /// @param[in]  src         Source data to be copied from.
+    /// @param      srcRowPitch Row pitch size in byte of @p src.
+    /// @param[out] dest        Destination texture to be copied to.
+    /// @param      mipLevel    Mip level of the destination texture to be copied to.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate temporary upload buffer.
+    YAGE_API auto CopyTexture(uint32_t     width,
+                              uint32_t     height,
+                              DXGI_FORMAT  srcFormat,
+                              const void  *src,
+                              uint32_t     srcRowPitch,
+                              PixelBuffer &dest,
+                              uint32_t     mipLevel) -> void;
 
     /// @brief
     ///   Set a single render target for current pipeline.

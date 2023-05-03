@@ -336,6 +336,15 @@ public:
     ///   Create a shader resource view. A new CPU descriptor handle will be allocated if this is a null shader resource view.
     ///
     /// @param resource     Resource to be viewed.
+    ///
+    /// @throw RenderAPIException
+    ///   Thrown if failed to allocate new descriptor.
+    YAGE_API auto Create(ID3D12Resource *resource) -> void;
+
+    /// @brief
+    ///   Create a shader resource view. A new CPU descriptor handle will be allocated if this is a null shader resource view.
+    ///
+    /// @param resource     Resource to be viewed.
     /// @param desc         Describes how to create this shader resource view.
     ///
     /// @throw RenderAPIException
