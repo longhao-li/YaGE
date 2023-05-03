@@ -6,7 +6,6 @@
 #include "GpuBuffer.h"
 #include "PipelineState.h"
 #include "RenderDevice.h"
-#include "Texture.h"
 
 namespace YaGE {
 
