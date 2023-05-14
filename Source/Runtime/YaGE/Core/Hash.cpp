@@ -19,16 +19,25 @@ YAGE_NODISCARD auto YaGE::Hash32(const void *data, size_t size, uint32_t seed) n
         };
 
         do {
-            for (uint32_t &i : v) {
-                uint32_t in;
-                memcpy(&in, data, sizeof(in)); // Avoid alignment problem
+            uint32_t in[4];
+            memcpy(&in, data, sizeof(in)); // Avoid alignment problem.
 
-                i += in * 0x85EBCA77U;
-                i = ((i << 13) | (i >> (32 - 13)));
-                i *= 0x9E3779B1U;
+            v[0] += in[0] * 0x85EBCA77U;
+            v[1] += in[1] * 0x85EBCA77U;
+            v[2] += in[2] * 0x85EBCA77U;
+            v[3] += in[3] * 0x85EBCA77U;
 
-                data = static_cast<const uint8_t *>(data) + 4;
-            }
+            v[0] = ((v[0] << 13) | (v[0] >> 19));
+            v[1] = ((v[1] << 13) | (v[1] >> 19));
+            v[2] = ((v[2] << 13) | (v[2] >> 19));
+            v[3] = ((v[3] << 13) | (v[3] >> 19));
+
+            v[0] *= 0x9E3779B1U;
+            v[1] *= 0x9E3779B1U;
+            v[2] *= 0x9E3779B1U;
+            v[3] *= 0x9E3779B1U;
+
+            data = static_cast<const uint8_t *>(data) + 16;
         } while (data < limit);
 
         h32 = ((v[0] << 1) | (v[0] >> (32 - 1))) + ((v[1] << 7) | (v[1] >> (32 - 7))) +
@@ -81,29 +90,57 @@ YAGE_NODISCARD auto YaGE::Hash64(const void *data, size_t size, uint64_t seed) n
         };
 
         do {
-            for (auto &i : v) {
-                uint64_t in;
-                memcpy(&in, data, sizeof(in)); // Avoid alignment.
+            uint64_t in[4];
+            memcpy(&in, data, sizeof(in)); // Avoid alignment problem.
 
-                i += in * 0xC2B2AE3D27D4EB4FULL;
-                i = ((i << 31) | (i >> 33));
-                i *= 0x9E3779B185EBCA87ULL;
+            v[0] += in[0] * 0xC2B2AE3D27D4EB4FULL;
+            v[1] += in[1] * 0xC2B2AE3D27D4EB4FULL;
+            v[2] += in[2] * 0xC2B2AE3D27D4EB4FULL;
+            v[3] += in[3] * 0xC2B2AE3D27D4EB4FULL;
 
-                data = static_cast<const uint8_t *>(data) + 8;
-            }
+            v[0] = ((v[0] << 31) | (v[0] >> 33));
+            v[1] = ((v[1] << 31) | (v[1] >> 33));
+            v[2] = ((v[2] << 31) | (v[2] >> 33));
+            v[3] = ((v[3] << 31) | (v[3] >> 33));
+
+            v[0] *= 0x9E3779B185EBCA87ULL;
+            v[1] *= 0x9E3779B185EBCA87ULL;
+            v[2] *= 0x9E3779B185EBCA87ULL;
+            v[3] *= 0x9E3779B185EBCA87ULL;
+
+            data = static_cast<const uint8_t *>(data) + 32;
         } while (data < limit);
 
         h64 = ((v[0] << 1) | (v[0] >> (64 - 1))) + ((v[1] << 7) | (v[1] >> (64 - 7))) +
               ((v[2] << 12) | (v[2] >> (64 - 12))) + ((v[3] << 18) | (v[3] >> (64 - 18)));
 
-        for (auto &i : v) {
-            i = i * 0xC2B2AE3D27D4EB4FULL;
-            i = ((i << 31) | (i >> 33));
-            i *= 0x9E3779B185EBCA87ULL;
+        v[0] *= 0xC2B2AE3D27D4EB4FULL;
+        v[0] = ((v[0] << 31) | (v[0] >> 33));
+        v[0] *= 0x9E3779B185EBCA87ULL;
 
-            h64 ^= i;
-            h64 = h64 * 0x9E3779B185EBCA87ULL + 0x85EBCA77C2B2AE63ULL;
-        }
+        h64 ^= v[0];
+        h64 = h64 * 0x9E3779B185EBCA87ULL + 0x85EBCA77C2B2AE63ULL;
+
+        v[1] *= 0xC2B2AE3D27D4EB4FULL;
+        v[1] = ((v[1] << 31) | (v[1] >> 33));
+        v[1] *= 0x9E3779B185EBCA87ULL;
+
+        h64 ^= v[1];
+        h64 = h64 * 0x9E3779B185EBCA87ULL + 0x85EBCA77C2B2AE63ULL;
+
+        v[2] *= 0xC2B2AE3D27D4EB4FULL;
+        v[2] = ((v[2] << 31) | (v[2] >> 33));
+        v[2] *= 0x9E3779B185EBCA87ULL;
+
+        h64 ^= v[2];
+        h64 = h64 * 0x9E3779B185EBCA87ULL + 0x85EBCA77C2B2AE63ULL;
+
+        v[3] *= 0xC2B2AE3D27D4EB4FULL;
+        v[3] = ((v[3] << 31) | (v[3] >> 33));
+        v[3] *= 0x9E3779B185EBCA87ULL;
+
+        h64 ^= v[3];
+        h64 = h64 * 0x9E3779B185EBCA87ULL + 0x85EBCA77C2B2AE63ULL;
     } else {
         h64 = seed + 0x27D4EB2F165667C5ULL;
     }

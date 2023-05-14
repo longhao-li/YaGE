@@ -117,6 +117,15 @@ YaGE::ShaderResourceView::~ShaderResourceView() noexcept {
         RenderDevice::Singleton().FreeShaderResourceView(handle);
 }
 
+auto YaGE::ShaderResourceView::Create(ID3D12Resource *resource) -> void {
+    RenderDevice &device = RenderDevice::Singleton();
+
+    if (handle.IsNull())
+        handle = device.AllocateShaderResourceView();
+
+    device.Device()->CreateShaderResourceView(resource, nullptr, handle);
+}
+
 auto YaGE::ShaderResourceView::Create(ID3D12Resource *resource, const D3D12_SHADER_RESOURCE_VIEW_DESC &desc) -> void {
     RenderDevice &device = RenderDevice::Singleton();
 

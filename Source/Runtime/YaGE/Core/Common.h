@@ -30,40 +30,48 @@
 #    define YAGE_CONSTEXPR20 inline
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1700)
-#    define YAGE_NODISCARD _Check_return_
-#elif defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #    define YAGE_NODISCARD __attribute__((warn_unused_result))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
+#    define YAGE_NODISCARD _Check_return_
 #elif YAGE_CPLUSPLUS >= 201703L
 #    define YAGE_NODISCARD [[nodiscard]]
 #else
 #    define YAGE_NODISCARD
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1700)
-#    define YAGE_FALLTHROUGH __fallthrough
-#elif defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #    define YAGE_FALLTHROUGH __attribute__((fallthrough))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
+#    define YAGE_FALLTHROUGH __fallthrough
 #elif YAGE_CPLUSPLUS >= 201703L
 #    define YAGE_FALLTHROUGH [[fallthrough]]
 #else
 #    define YAGE_FALLTHROUGH
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1700)
-#    define YAGE_DEPRECATED __declspec(deprecated)
-#elif defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #    define YAGE_DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
+#    define YAGE_DEPRECATED __declspec(deprecated)
 #elif YAGE_CPLUSPLUS >= 201402L
 #    define YAGE_DEPRECATED [[deprecated]]
 #else
 #    define YAGE_DEPRECATED
 #endif
 
-#if defined(_MSC_VER)
-#    define YAGE_FORCEINLINE __forceinline
-#elif defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #    define YAGE_FORCEINLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+#    define YAGE_FORCEINLINE __forceinline
 #else
 #    define YAGE_FORCEINLINE inline
+#endif
+
+#if defined(__clang__) || defined(__GNUC__)
+#    define YAGE_ALIGNAS(x) __attribute__((aligned(x)))
+#elif defined(_MSC_VER)
+#    define YAGE_ALIGNAS(x) __declspec(align(x))
+#else
+#    define YAGE_ALIGNAS(x) alignas(x)
 #endif
