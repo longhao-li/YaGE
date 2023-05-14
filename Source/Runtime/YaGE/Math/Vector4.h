@@ -20,11 +20,24 @@ struct Vector4 {
     union {
         DirectX::XMVECTOR _vec;
         float             _arr[4];
+        Vector2           xy;
+        Vector3           xyz;
         struct {
             float x;
-            float y;
-            float z;
-            float w;
+            union {
+                Vector2 yz;
+                Vector3 yzw;
+                struct {
+                    float y;
+                    union {
+                        Vector2 zw;
+                        struct {
+                            float z;
+                            float w;
+                        };
+                    };
+                };
+            };
         };
     };
 #if defined(__clang__)

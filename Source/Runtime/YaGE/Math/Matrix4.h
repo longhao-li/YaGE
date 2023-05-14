@@ -4,6 +4,8 @@
 
 namespace YaGE {
 
+struct Quaternion;
+
 struct Matrix4 {
 #if defined(__clang__)
 #    pragma clang diagnostic push
@@ -96,6 +98,12 @@ struct Matrix4 {
     ///
     /// @param mat  The DirectX math matrix to initialize the matrix with.
     YAGE_FORCEINLINE Matrix4(DirectX::XMMATRIX mat) noexcept : _xmmat(mat) {}
+
+    /// @brief
+    ///   Create a rotation matrix from quaternion.
+    ///
+    /// @param quat  The quaternion to initialize the matrix with.
+    YAGE_FORCEINLINE Matrix4(Quaternion quat) noexcept;
 
     /// @brief
     ///   Random access elements of this matrix by index.

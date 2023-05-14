@@ -16,11 +16,17 @@ struct Vector3 {
 #    pragma warning(disable : 4201)
 #endif
     union {
-        float _arr[3];
+        float   _arr[3];
+        Vector2 xy;
         struct {
             float x;
-            float y;
-            float z;
+            union {
+                Vector2 yz;
+                struct {
+                    float y;
+                    float z;
+                };
+            };
         };
     };
 #if defined(__clang__)

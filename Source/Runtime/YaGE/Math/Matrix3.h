@@ -4,6 +4,8 @@
 
 namespace YaGE {
 
+struct Quaternion;
+
 struct Matrix3 {
     Vector3 data[3];
 
@@ -60,6 +62,12 @@ struct Matrix3 {
     /// @param arr  The array of values to initialize the matrix with.
     YAGE_FORCEINLINE explicit Matrix3(const float arr[9]) noexcept
         : data{Vector3(arr[0], arr[1], arr[2]), Vector3(arr[3], arr[4], arr[5]), Vector3(arr[6], arr[7], arr[8])} {}
+
+    /// @brief
+    ///   Create a rotation matrix from quaternion.
+    ///
+    /// @param quat  The quaternion to initialize the matrix with.
+    YAGE_FORCEINLINE Matrix3(Quaternion quat) noexcept;
 
     /// @brief
     ///   Random access elements of this matrix by index.
