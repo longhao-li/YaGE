@@ -70,18 +70,6 @@ struct Vector3 {
     YAGE_FORCEINLINE Vector3(float x, Vector2 yz) noexcept : x(x), y(yz.x), z(yz.y) {}
 
     /// @brief
-    ///   Create a 3D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to initialize the vector with.
-    YAGE_FORCEINLINE Vector3(const Vector3 &v) noexcept : x(v.x), y(v.y), z(v.z) {}
-
-    /// @brief
-    ///   Create a 2D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to initialize the vector with.
-    YAGE_FORCEINLINE Vector3(Vector3 &&v) noexcept : x(v.x), y(v.y), z(v.z) {}
-
-    /// @brief
     ///   Random access elements of this vector by index.
     ///
     /// @param i    The index of the element to access.

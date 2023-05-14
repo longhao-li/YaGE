@@ -56,18 +56,6 @@ struct Vector2 {
     YAGE_FORCEINLINE explicit Vector2(const float arr[2]) noexcept : x(arr[0]), y(arr[1]) {}
 
     /// @brief
-    ///   Create a 2D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to initialize the vector with.
-    YAGE_FORCEINLINE Vector2(const Vector2 &v) noexcept : x(v.x), y(v.y) {}
-
-    /// @brief
-    ///   Create a 2D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to initialize the vector with.
-    YAGE_FORCEINLINE Vector2(Vector2 &&v) noexcept : x(v.x), y(v.y) {}
-
-    /// @brief
     ///   Random access elements of this vector by index.
     ///
     /// @param i    The index of the element to access.

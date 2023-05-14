@@ -119,18 +119,6 @@ struct Vector4 {
     YAGE_FORCEINLINE Vector4(DirectX::XMVECTOR v) noexcept : _vec(v) {}
 
     /// @brief
-    ///   Create a 4D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to be copied from.
-    YAGE_FORCEINLINE Vector4(const Vector4 &v) noexcept : _vec(v._vec) {}
-
-    /// @brief
-    ///   Create a 4D vector and initialize with specified values.
-    ///
-    /// @param v    The vector to be moved from.
-    YAGE_FORCEINLINE Vector4(Vector4 &&v) noexcept : _vec(v._vec) {}
-
-    /// @brief
     ///   Random access elements of this vector by index.
     ///
     /// @param i    The index of the element to access.
