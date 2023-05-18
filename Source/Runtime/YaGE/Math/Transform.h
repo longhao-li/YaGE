@@ -10,26 +10,14 @@ public:
     /// @brief
     ///   Create an identity transform object.
     YAGE_FORCEINLINE Transform() noexcept
-        : translate(),
-          rotation(1.0f),
-          scale(1.0f),
-          localMatrix(1.0f),
-          parentMatrix(1.0f),
-          worldMatrix(1.0f),
-          isDirty(false) {}
+        : translate(), rotation(1.0f), scale(1.0f), localMatrix(1.0f), parent(nullptr), isLocalDirty(false) {}
 
     /// @brief
     ///   Create a transform object from the given transform matrix.
     ///
     /// @param transform    The transform matrix to be decomposed.
     YAGE_FORCEINLINE Transform(Matrix4 transform) noexcept
-        : translate(),
-          rotation(),
-          scale(),
-          localMatrix(transform),
-          parentMatrix(1.0f),
-          worldMatrix(transform),
-          isDirty(false) {
+        : translate(), rotation(), scale(), localMatrix(transform), parent(nullptr), isLocalDirty(false) {
         DirectX::XMMatrixDecompose(&scale._vec, &rotation._vec, &translate._vec, transform._xmmat);
     }
 
@@ -44,11 +32,9 @@ public:
           rotation(rotation),
           scale(scale),
           localMatrix(1.0f),
-          parentMatrix(1.0f),
-          worldMatrix(1.0f),
-          isDirty(false) {
+          parent(nullptr),
+          isLocalDirty(false) {
         localMatrix.Scale(scale).Rotate(rotation).Translate(translate);
-        worldMatrix = localMatrix;
     }
 
     /// @brief
@@ -62,11 +48,9 @@ public:
           rotation(rotation),
           scale(scale, 0.0f),
           localMatrix(1.0f),
-          parentMatrix(1.0f),
-          worldMatrix(1.0f),
-          isDirty(false) {
+          parent(nullptr),
+          isLocalDirty(false) {
         localMatrix.Scale(this->scale).Rotate(rotation).Translate(this->translate);
-        worldMatrix = localMatrix;
     }
 
     /// @brief
@@ -76,8 +60,7 @@ public:
     YAGE_FORCEINLINE auto SetLocalTransform(Matrix4 transform) noexcept -> void {
         localMatrix = transform;
         DirectX::XMMatrixDecompose(&scale._vec, &rotation._vec, &translate._vec, transform._xmmat);
-        worldMatrix = localMatrix * parentMatrix;
-        isDirty     = false;
+        isLocalDirty = false;
     }
 
     /// @brief
@@ -85,8 +68,8 @@ public:
     ///
     /// @param trans    The new local translate position.
     YAGE_FORCEINLINE auto SetLocalTranslate(Vector3 trans) noexcept -> void {
-        translate = Vector4(trans, 0.0f);
-        isDirty   = true;
+        translate    = Vector4(trans, 0.0f);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -94,8 +77,8 @@ public:
     ///
     /// @param trans    The new local translate position.
     YAGE_FORCEINLINE auto SetLocalTranslate(Vector4 trans) noexcept -> void {
-        translate = trans;
-        isDirty   = true;
+        translate    = trans;
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -105,8 +88,8 @@ public:
     /// @param y    The new local translate position on Y axis.
     /// @param z    The new local translate position on Z axis.
     YAGE_FORCEINLINE auto SetLocalTranslate(float x, float y, float z) noexcept -> void {
-        translate = Vector4(x, y, z, 0.0f);
-        isDirty   = true;
+        translate    = Vector4(x, y, z, 0.0f);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -114,8 +97,8 @@ public:
     ///
     /// @param rot    The new local rotation.
     YAGE_FORCEINLINE auto SetLocalRotation(Quaternion rot) noexcept -> void {
-        rotation = rot;
-        isDirty  = true;
+        rotation     = rot;
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -124,8 +107,8 @@ public:
     /// @param axis    The axis to be rotated around.
     /// @param radius  The radius of rotation.
     YAGE_FORCEINLINE auto SetLocalRotation(Vector3 axis, float radius) noexcept -> void {
-        rotation = Quaternion(axis, radius);
-        isDirty  = true;
+        rotation     = Quaternion(axis, radius);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -134,8 +117,8 @@ public:
     /// @param axis    The axis to be rotated around.
     /// @param radius  The radius of rotation.
     YAGE_FORCEINLINE auto SetLocalRotation(Vector4 axis, float radius) noexcept -> void {
-        rotation = Quaternion(axis, radius);
-        isDirty  = true;
+        rotation     = Quaternion(axis, radius);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -145,8 +128,8 @@ public:
     /// @param yaw      The yaw angle in radians.
     /// @param roll     The roll angle in radians.
     YAGE_FORCEINLINE auto SetLocalRotation(float pitch, float yaw, float roll) noexcept -> void {
-        rotation = Quaternion(pitch, yaw, roll);
-        isDirty  = true;
+        rotation     = Quaternion(pitch, yaw, roll);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -154,8 +137,8 @@ public:
     ///
     /// @param factor    The new local scale factors.
     YAGE_FORCEINLINE auto SetLocalScale(Vector3 factor) noexcept -> void {
-        scale   = Vector4(factor, 0.0f);
-        isDirty = true;
+        scale        = Vector4(factor, 0.0f);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -163,8 +146,8 @@ public:
     ///
     /// @param factor    The new local scale factors.
     YAGE_FORCEINLINE auto SetLocalScale(Vector4 factor) noexcept -> void {
-        scale   = factor;
-        isDirty = true;
+        scale        = factor;
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -174,8 +157,8 @@ public:
     /// @param y    The new local scale factor on Y axis.
     /// @param z    The new local scale factor on Z axis.
     YAGE_FORCEINLINE auto SetLocalScale(float x, float y, float z) noexcept -> void {
-        scale   = Vector4(x, y, z, 0.0f);
-        isDirty = true;
+        scale        = Vector4(x, y, z, 0.0f);
+        isLocalDirty = true;
     }
 
     /// @brief
@@ -205,56 +188,60 @@ public:
     /// @return Matrix4
     ///   Return a matrix that represents local transform.
     YAGE_NODISCARD YAGE_FORCEINLINE auto LocalMatrix() const noexcept -> Matrix4 {
-        if (isDirty) {
-            localMatrix = Matrix4(1.0f).Scale(scale).Rotate(rotation).Translate(translate);
-            worldMatrix = localMatrix * parentMatrix;
-            isDirty     = false;
+        if (isLocalDirty) {
+            localMatrix  = Matrix4(1.0f).Scale(scale).Rotate(rotation).Translate(translate);
+            isLocalDirty = false;
         }
 
         return localMatrix;
     }
 
     /// @brief
-    ///   Get world transform matrix.
+    ///   Get transform matrix.
+    /// @note
+    ///   This function will recursively calculate world transform matrix from parent transform. Therefore, for performace consideration, please cache the result if you need to use it multiple times.
     ///
     /// @return Matrix4
     ///   Return a matrix that represents world transform.
-    YAGE_NODISCARD YAGE_FORCEINLINE auto WorldMatrix() const noexcept -> Matrix4 {
-        if (isDirty) {
-            localMatrix = Matrix4(1.0f).Scale(scale).Rotate(rotation).Translate(translate);
-            worldMatrix = localMatrix * parentMatrix;
-            isDirty     = false;
+    YAGE_NODISCARD YAGE_FORCEINLINE auto TransformMatrix() const noexcept -> Matrix4 {
+        Matrix4 parentMatrix(1.0f);
+        if (parent != nullptr) {
+            Transform *current = parent;
+            while (current != nullptr) {
+                parentMatrix = current->LocalMatrix() * parentMatrix;
+                current      = current->parent;
+            }
         }
 
-        return worldMatrix;
-    }
-
-    /// @brief
-    ///   Set parent transform for this transform.
-    ///
-    /// @param parent    The parent transform to be set.
-    YAGE_FORCEINLINE auto SetParent(Matrix4 parent) noexcept -> void {
-        parentMatrix = parent;
-        isDirty      = true;
+        return parentMatrix * LocalMatrix();
     }
 
     /// @brief
     ///   Set parent transform for this transform.
     /// @note
-    ///   Reference of the parent transform object will not be cached in this object. Parent matrix must be updated manually every time when the parent transform is updated.
+    ///   Child transforms will cache pointer to parent transform. Therefore, parent transforms must be pinned.
     ///
-    /// @param parent    The parent transform to be set.
-    YAGE_FORCEINLINE auto SetParent(const Transform &parent) noexcept -> void {
-        parentMatrix = parent.WorldMatrix();
-        isDirty      = true;
-    }
+    /// @param newParent    The parent transform to be set.
+    YAGE_FORCEINLINE auto SetParent(Transform &newParent) noexcept -> void { parent = &newParent; }
 
     /// @brief
-    ///   Get parent transform matrix.
+    ///   Remove parent transform for this transform.
+    YAGE_FORCEINLINE auto RemoveParent() noexcept -> void { parent = nullptr; }
+
+    /// @brief
+    ///   Get parent transform object.
     ///
-    /// @return Matrix4
-    ///   Return a matrix that represents parent transform.
-    YAGE_NODISCARD auto ParentMatrix() const noexcept -> Matrix4 { return parentMatrix; }
+    /// @return Transform *
+    ///   Return a transform object that represents parent transform.
+    YAGE_NODISCARD YAGE_FORCEINLINE auto Parent() const noexcept -> Transform * { return parent; }
+
+    /// @brief
+    ///   Checks if this transform has a parent transform.
+    ///
+    /// @return bool
+    /// @retval true    This transform has a parent transform.
+    /// @retval false   This transform does not have a parent transform.
+    YAGE_NODISCARD YAGE_FORCEINLINE auto HasParent() const noexcept -> bool { return parent != nullptr; }
 
 private:
     // Local coordinate transform.
@@ -264,10 +251,9 @@ private:
 
     // Cached transform matrix.
     mutable Matrix4 localMatrix;
-    mutable Matrix4 parentMatrix;
-    mutable Matrix4 worldMatrix;
 
-    mutable bool isDirty;
+    Transform   *parent;
+    mutable bool isLocalDirty;
 };
 
 } // namespace YaGE
