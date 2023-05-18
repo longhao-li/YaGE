@@ -211,4 +211,20 @@ YAGE_NODISCARD YAGE_FORCEINLINE auto Lerp(Vector2 start, Vector2 end, float t) n
     return start + (end - start) * t;
 }
 
+YAGE_NODISCARD YAGE_FORCEINLINE auto Abs(Vector2 vec) noexcept -> Vector2 {
+    return Vector2(vec.x < 0 ? -vec.x : vec.x, vec.y < 0 ? -vec.y : vec.y);
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Min(Vector2 lhs, Vector2 rhs) noexcept -> Vector2 {
+    return Vector2(lhs.x < rhs.x ? lhs.x : rhs.x, lhs.y < rhs.y ? lhs.y : rhs.y);
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Max(Vector2 lhs, Vector2 rhs) noexcept -> Vector2 {
+    return Vector2(lhs.x < rhs.x ? rhs.x : lhs.x, lhs.y < rhs.y ? rhs.y : lhs.y);
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Clamp(Vector2 vec, Vector2 floor, Vector2 ceil) noexcept -> Vector2 {
+    return Max(floor, Min(ceil, vec));
+}
+
 } // namespace YaGE

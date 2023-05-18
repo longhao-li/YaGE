@@ -244,4 +244,36 @@ YAGE_NODISCARD YAGE_FORCEINLINE auto Lerp(Vector3 start, Vector3 end, float t) n
     return start + (end - start) * t;
 }
 
+YAGE_NODISCARD YAGE_FORCEINLINE auto Abs(Vector3 vec) noexcept -> Vector3 {
+    return Vector3{
+        vec.x < 0 ? -vec.x : vec.x,
+        vec.y < 0 ? -vec.y : vec.y,
+        vec.z < 0 ? -vec.z : vec.z,
+    };
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Min(Vector3 lhs, Vector3 rhs) noexcept -> Vector3 {
+    return Vector3{
+        lhs.x < rhs.x ? lhs.x : rhs.x,
+        lhs.y < rhs.y ? lhs.y : rhs.y,
+        lhs.z < rhs.z ? lhs.z : rhs.z,
+    };
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Max(Vector3 lhs, Vector3 rhs) noexcept -> Vector3 {
+    return Vector3{
+        lhs.x < rhs.x ? rhs.x : lhs.x,
+        lhs.y < rhs.y ? rhs.y : lhs.y,
+        lhs.z < rhs.z ? rhs.z : lhs.z,
+    };
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Clamp(Vector3 vec, Vector3 floor, Vector3 ceil) noexcept -> Vector3 {
+    return Vector3{
+        vec.x < floor.x ? floor.x : (vec.x > ceil.x ? ceil.x : vec.x),
+        vec.y < floor.y ? floor.y : (vec.y > ceil.y ? ceil.y : vec.y),
+        vec.z < floor.z ? floor.z : (vec.z > ceil.z ? ceil.z : vec.z),
+    };
+}
+
 } // namespace YaGE

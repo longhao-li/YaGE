@@ -281,4 +281,18 @@ YAGE_NODISCARD YAGE_FORCEINLINE auto Lerp(Vector4 start, Vector4 end, float t) n
     return DirectX::XMVectorLerp(start._vec, end._vec, t);
 }
 
+YAGE_NODISCARD YAGE_FORCEINLINE auto Abs(Vector4 v) noexcept -> Vector4 { return DirectX::XMVectorAbs(v._vec); }
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Min(Vector4 v0, Vector4 v1) noexcept -> Vector4 {
+    return DirectX::XMVectorMin(v0._vec, v1._vec);
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Max(Vector4 v0, Vector4 v1) noexcept -> Vector4 {
+    return DirectX::XMVectorMax(v0._vec, v1._vec);
+}
+
+YAGE_NODISCARD YAGE_FORCEINLINE auto Clamp(Vector4 v, Vector4 floor, Vector4 ceil) noexcept -> Vector4 {
+    return DirectX::XMVectorClamp(v._vec, floor._vec, ceil._vec);
+}
+
 } // namespace YaGE
