@@ -327,6 +327,17 @@ struct Matrix4 {
     }
 
     /// @brief
+    ///   Apply rotate transform to this matrix.
+    /// @note
+    ///   This function will change the matrix itself. If you want to get a rotated matrix, use Rotated() instead.
+    ///
+    /// @param quat     Rotation quaternion.
+    ///
+    /// @return Matrix4f &
+    ///   Return reference to this matrix after rotation.
+    YAGE_FORCEINLINE auto Rotate(Quaternion quat) noexcept -> Matrix4 &;
+
+    /// @brief
     ///   Get the matrix that is applied by the specified rotation.
     ///
     /// @param axis     Rotation axis. Should not be zero vector.
@@ -351,6 +362,15 @@ struct Matrix4 {
         auto rotate = DirectX::XMMatrixRotationAxis(axis._vec, radian);
         return Matrix4(_xmmat * rotate);
     }
+
+    /// @brief
+    ///   Get the matrix that is applied by the specified rotation.
+    ///
+    /// @param quat     Rotation quaternion.
+    ///
+    /// @return Matrix4
+    ///   Return a matrix that is applied by the specified rotation.
+    YAGE_NODISCARD YAGE_FORCEINLINE auto Rotated(Quaternion quat) const noexcept -> Matrix4;
 
     /// @brief
     ///   Apply translation transform to this matrix.

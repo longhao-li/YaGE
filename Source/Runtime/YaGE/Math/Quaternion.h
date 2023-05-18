@@ -288,4 +288,29 @@ YAGE_FORCEINLINE Matrix3::Matrix3(Quaternion quat) noexcept {
 /// @param quat  The quaternion to initialize the matrix with.
 YAGE_FORCEINLINE Matrix4::Matrix4(Quaternion quat) noexcept : _xmmat(DirectX::XMMatrixRotationQuaternion(quat._vec)) {}
 
+/// @brief
+///   Apply rotate transform to this matrix.
+/// @note
+///   This function will change the matrix itself. If you want to get a rotated matrix, use Rotated() instead.
+///
+/// @param quat     Rotation quaternion.
+///
+/// @return Matrix4f &
+///   Return reference to this matrix after rotation.
+YAGE_FORCEINLINE auto Matrix4::Rotate(Quaternion quat) noexcept -> Matrix4 & {
+    _xmmat = DirectX::XMMatrixMultiply(_xmmat, DirectX::XMMatrixRotationQuaternion(quat._vec));
+    return *this;
+}
+
+/// @brief
+///   Get the matrix that is applied by the specified rotation.
+///
+/// @param quat     Rotation quaternion.
+///
+/// @return Matrix4
+///   Return a matrix that is applied by the specified rotation.
+YAGE_FORCEINLINE auto Matrix4::Rotated(Quaternion quat) const noexcept -> Matrix4 {
+    return Matrix4(DirectX::XMMatrixMultiply(_xmmat, DirectX::XMMatrixRotationQuaternion(quat._vec)));
+}
+
 } // namespace YaGE
