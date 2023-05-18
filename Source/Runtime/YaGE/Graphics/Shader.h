@@ -141,6 +141,14 @@ public:
     YAGE_API auto LoadBinary(StringView path) noexcept -> bool;
 
     /// @brief
+    ///   Checks if this shader is empty.
+    ///
+    /// @return bool
+    /// @retval true    This shader is empty.
+    /// @retval false   This shader is not empty.
+    YAGE_NODISCARD auto IsEmpty() const noexcept -> bool { return shaderBinary == nullptr; }
+
+    /// @brief
     ///   Get pointer to shader data.
     ///
     /// @return const void *
