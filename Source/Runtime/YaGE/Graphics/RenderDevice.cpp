@@ -155,6 +155,9 @@ YAGE_NODISCARD auto YaGE::RenderDevice::SupportRayTracing() const noexcept -> bo
 
 YAGE_NODISCARD auto YaGE::RenderDevice::SupportUnorderedAccess(DXGI_FORMAT format) const noexcept -> bool {
     switch (format) {
+    case DXGI_FORMAT_R32_FLOAT:
+    case DXGI_FORMAT_R32_UINT:
+    case DXGI_FORMAT_R32_SINT:
     case DXGI_FORMAT_R32G32B32A32_FLOAT:
     case DXGI_FORMAT_R32G32B32A32_UINT:
     case DXGI_FORMAT_R32G32B32A32_SINT:
