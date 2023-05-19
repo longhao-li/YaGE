@@ -39,7 +39,8 @@ YaGE::ColorBuffer::ColorBuffer(uint32_t    width,
     this->pixelFormat = format;
 
     // Create D3D12 resources.
-    RenderDevice &device = RenderDevice::Singleton();
+    RenderDevice &device                 = RenderDevice::Singleton();
+    const bool    supportUnorderedAccess = (sampleCount == 1) && device.SupportUnorderedAccess(format);
 
     { // Create ID3D12Resource.
         const D3D12_HEAP_PROPERTIES heapProps{
@@ -52,7 +53,7 @@ YaGE::ColorBuffer::ColorBuffer(uint32_t    width,
 
         // Enable unordered access if multi-sample is not enabled.
         D3D12_RESOURCE_FLAGS resourceFlags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        if (sampleCount == 1 && device.SupportUnorderedAccess(format))
+        if (supportUnorderedAccess)
             resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         const D3D12_RESOURCE_DESC desc{
@@ -135,7 +136,7 @@ YaGE::ColorBuffer::ColorBuffer(uint32_t    width,
     }
 
     // Create unordered access view.
-    if (sampleCount == 1 && device.SupportUnorderedAccess(format)) {
+    if (supportUnorderedAccess) {
         D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
         desc.Format = format;
 

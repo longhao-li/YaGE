@@ -32,7 +32,8 @@ YaGE::Texture::Texture(
     this->pixelFormat = format;
 
     // Create D3D12 resources.
-    RenderDevice &device = RenderDevice::Singleton();
+    RenderDevice &device                 = RenderDevice::Singleton();
+    const bool    supportUnorderedAccess = device.SupportUnorderedAccess(format);
 
     { // Create ID3D12Resource
         const D3D12_HEAP_PROPERTIES heapProps{
@@ -42,6 +43,10 @@ YaGE::Texture::Texture(
             /* CreationNodeMask     = */ 0,
             /* VisibleNodeMask      = */ 0,
         };
+
+        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+        if (supportUnorderedAccess)
+            flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         const D3D12_RESOURCE_DESC desc{
             /* Dimension        = */ D3D12_RESOURCE_DIMENSION_TEXTURE2D,
@@ -57,7 +62,7 @@ YaGE::Texture::Texture(
                 /* Quality = */ 0,
             },
             /* Layout = */ D3D12_TEXTURE_LAYOUT_UNKNOWN,
-            /* Flags  = */ D3D12_RESOURCE_FLAG_NONE,
+            /* Flags  = */ flags,
         };
 
         HRESULT hr = device.Device()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc,
@@ -89,6 +94,28 @@ YaGE::Texture::Texture(
         srv.Create(resource.Get(), desc);
     } else {
         srv.Create(resource.Get());
+    }
+
+    // Create unordered access views.
+    if (supportUnorderedAccess) {
+        const uint32_t maxSubresourceIndex = (mipmapLevels < 16 ? mipmapLevels : 16);
+        for (uint32_t i = 0; i < maxSubresourceIndex; ++i) {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
+            desc.Format = format;
+            if (arraySize > 1) {
+                desc.ViewDimension                  = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+                desc.Texture2DArray.MipSlice        = i;
+                desc.Texture2DArray.FirstArraySlice = 0;
+                desc.Texture2DArray.ArraySize       = arraySize;
+                desc.Texture2DArray.PlaneSlice      = 0;
+            } else {
+                desc.ViewDimension        = D3D12_UAV_DIMENSION_TEXTURE2D;
+                desc.Texture2D.MipSlice   = i;
+                desc.Texture2D.PlaneSlice = 0;
+            }
+
+            uav[i].Create(resource.Get(), desc);
+        }
     }
 }
 

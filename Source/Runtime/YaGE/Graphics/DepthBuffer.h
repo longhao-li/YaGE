@@ -89,6 +89,21 @@ public:
     ///   Return depth shader resource view CPU descriptor handle of this depth buffer.
     YAGE_NODISCARD auto DepthShaderResourceView() const noexcept -> CpuDescriptorHandle { return srv; }
 
+    /// @brief
+    ///   Checks if this depth buffer supports unordered access.
+    ///
+    /// @return bool
+    /// @retval true    This depth buffer supports unordered access.
+    /// @retval false   This depth buffer does not support unordered access.
+    YAGE_NODISCARD auto SupportUnorderedAccess() const noexcept -> bool { return !uav.IsNull(); }
+
+    /// @brief
+    ///   Get depth unordered access view CPU descriptor handle of this depth buffer. It is not guaranteed that this depth buffer supports unordered access.
+    ///
+    /// @return CpuDescriptorHandle
+    ///   Return depth unordered access view CPU descriptor handle of this depth buffer.
+    YAGE_NODISCARD auto DepthUnorderedAccessView() const noexcept -> CpuDescriptorHandle { return uav; }
+
 private:
     /// @brief  Depth clear value of this depth buffer. Default value is 1.0f.
     float clearDepth;
@@ -104,6 +119,9 @@ private:
 
     /// @brief  Depth shader resource view of this depth buffer.
     YaGE::ShaderResourceView srv;
+
+    /// @brief  Depth unordered access resource view of this depth buffer.
+    YaGE::UnorderedAccessView uav;
 };
 
 } // namespace YaGE

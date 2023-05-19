@@ -34,10 +34,10 @@ YAGE_NODISCARD YAGE_FORCEINLINE static auto GetDepthFormat(DXGI_FORMAT format) n
 }
 
 YaGE::DepthBuffer::DepthBuffer() noexcept
-    : PixelBuffer(), clearDepth(1.0f), clearStencil(), dsv(), depthReadOnlyView(), srv() {}
+    : PixelBuffer(), clearDepth(1.0f), clearStencil(), dsv(), depthReadOnlyView(), srv(), uav() {}
 
 YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT format, uint32_t sampleCount)
-    : PixelBuffer(), clearDepth(1.0f), clearStencil(), dsv(), depthReadOnlyView(), srv() {
+    : PixelBuffer(), clearDepth(1.0f), clearStencil(), dsv(), depthReadOnlyView(), srv(), uav() {
     if (sampleCount == 0)
         sampleCount = 1;
 
@@ -49,7 +49,9 @@ YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT form
     this->pixelFormat = format;
 
     // Create D3D12 resources.
-    RenderDevice &device = RenderDevice::Singleton();
+    RenderDevice &device                 = RenderDevice::Singleton();
+    DXGI_FORMAT   depthFormat            = GetDepthFormat(format);
+    const bool    supportUnorderedAccess = (sampleCount == 1) && device.SupportUnorderedAccess(depthFormat);
 
     { // Create ID3D12Resource.
         const D3D12_HEAP_PROPERTIES heapProps{
@@ -59,6 +61,10 @@ YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT form
             /* CreationNodeMask     = */ 0,
             /* VisibleNodeMask      = */ 0,
         };
+
+        D3D12_RESOURCE_FLAGS flag = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        if (supportUnorderedAccess)
+            flag |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         const D3D12_RESOURCE_DESC desc{
             /* Dimension        = */ D3D12_RESOURCE_DIMENSION_TEXTURE2D,
@@ -74,7 +80,7 @@ YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT form
                 /* Quality = */ 0,
             },
             /* Layout = */ D3D12_TEXTURE_LAYOUT_UNKNOWN,
-            /* Flags  = */ D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
+            /* Flags  = */ flag,
         };
 
         D3D12_CLEAR_VALUE clearValue;
@@ -121,7 +127,7 @@ YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT form
 
     { // Create shader resource view.
         D3D12_SHADER_RESOURCE_VIEW_DESC desc;
-        desc.Format                  = GetDepthFormat(format);
+        desc.Format                  = depthFormat;
         desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
         if (sampleCount > 1) {
@@ -136,6 +142,17 @@ YaGE::DepthBuffer::DepthBuffer(uint32_t width, uint32_t height, DXGI_FORMAT form
 
         srv.Create(this->resource.Get(), desc);
     }
+
+    // Create unordered access view.
+    if (supportUnorderedAccess) {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
+        desc.Format               = depthFormat;
+        desc.ViewDimension        = D3D12_UAV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipSlice   = 0;
+        desc.Texture2D.PlaneSlice = 0;
+
+        uav.Create(this->resource.Get(), desc);
+    }
 }
 
 YaGE::DepthBuffer::DepthBuffer(DepthBuffer &&other) noexcept
@@ -144,7 +161,8 @@ YaGE::DepthBuffer::DepthBuffer(DepthBuffer &&other) noexcept
       clearStencil(other.clearStencil),
       dsv(std::move(other.dsv)),
       depthReadOnlyView(std::move(other.depthReadOnlyView)),
-      srv(std::move(other.srv)) {
+      srv(std::move(other.srv)),
+      uav(std::move(other.uav)) {
     other.clearDepth   = 1.0f;
     other.clearStencil = 0;
 }
@@ -157,6 +175,7 @@ auto YaGE::DepthBuffer::operator=(DepthBuffer &&other) noexcept -> DepthBuffer &
     dsv               = std::move(other.dsv);
     depthReadOnlyView = std::move(other.depthReadOnlyView);
     srv               = std::move(other.srv);
+    uav               = std::move(other.uav);
 
     other.clearDepth   = 1.0f;
     other.clearStencil = 0;

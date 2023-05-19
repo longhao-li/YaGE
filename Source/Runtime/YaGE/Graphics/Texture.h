@@ -76,12 +76,34 @@ public:
     ///   Return a CPU descriptor handle to the shader resource view.
     YAGE_NODISCARD auto ShaderResourceView() const noexcept -> CpuDescriptorHandle { return srv; }
 
+    /// @brief
+    ///   Checks if this texture supports unordered access.
+    ///
+    /// @return bool
+    /// @retval true    This texture supports unordered access.
+    /// @retval false   This texture does not support unordered access.
+    YAGE_NODISCARD auto SupportUnorderedAccess() const noexcept -> bool { return !uav[0].IsNull(); }
+
+    /// @brief
+    ///   Get unordered access view for a specific mipmap level.
+    ///
+    /// @param mipmapLevel    Mipmap level of the unordered access view. This value should not be greater than 16.
+    ///
+    /// @return CpuDescriptorHandle
+    ///   Return a CPU descriptor handle to the unordered access view. A null descriptor handle will be returned if the specified mipmap level doesn't exist.
+    YAGE_NODISCARD auto UnorderedAccessView(uint32_t mipmapLevel = 0) const noexcept -> CpuDescriptorHandle {
+        return uav[mipmapLevel];
+    }
+
 private:
     /// @brief  Specifies whether this is a cube texture.
     bool isCubeTexture;
 
     /// @brief  Shader resource view that referres to the whole texture. For cube texture, this is a texture cube shader resource view.
     YaGE::ShaderResourceView srv;
+
+    /// @brief  Unordered access view for each mipmap levels.
+    YaGE::UnorderedAccessView uav[16];
 };
 
 } // namespace YaGE
